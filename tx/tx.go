@@ -8,28 +8,15 @@ import (
 	"math/big"
 
 	"github.com/btcsuite/btcutil/base58"
+
+	"mybc/utils"
+	"mybc/wallet"
 )
 
-type Input struct {
-	PreId     []byte
-	PreIndex  int64
-	Signature []byte
-	PrePubKey []byte
-}
-
-type Output struct {
-	Amount     float64
-	PubKeyHash []byte
-}
-
 type TX struct {
-	Id      []byte
-	Inputs  []Input
-	Outputs []Output
-}
-
-func NewOutput(value float64, address string) *Output {
-	return &Output{value, GetPubKeyHash(address)}
+	Signature []byte
+	DenomTX   []byte
+	FileTX    []byte
 }
 
 // 将地址转换为公钥哈希
@@ -39,65 +26,30 @@ func GetPubKeyHash(address string) []byte {
 	return pubKeyHash
 }
 
-// 创建挖矿交易
-func NewCoinbaseTX(miner string) *TX {
-	if !IsValidAddress(miner) {
-		fmt.Println("发现无效挖矿地址")
-		return &TX{}
-	} else {
-		_, ok := NewWallets().Gather[miner]
-		if !ok {
-			fmt.Println("该挖矿地址不存在")
-			return &TX{}
-		}
-	}
-	input := Input{nil, -1, nil, []byte("genesis")}
-	tx := TX{nil, []Input{input}, []Output{*NewOutput(12.5, miner)}}
-	tx.Id = Serialize(tx)
-	return &tx
-}
+// 创建文件交易
+func NewFileTx() {}
 
-// 创建转账交易
-func NewTX(from, to string, amount float64, bc *BC) *TX {
-	if !IsValidAddress(from) || !IsValidAddress(to) {
+// 创建denom交易
+func NewDenomTX(from, to string, amount float64) *TX {
+	if !wallet.IsValidAddress(from) || !wallet.IsValidAddress(to) {
 		fmt.Println("发现无效非挖矿地址")
 		return &TX{}
 	} else {
-		_, ok1 := NewWallets().Gather[from]
-		_, ok2 := NewWallets().Gather[to]
+		_, ok1 := wallet.NewWallets().Gather[from]
+		_, ok2 := wallet.NewWallets().Gather[to]
 		if !ok1 || !ok2 {
 			fmt.Println("交易地址不存在")
 			return &TX{}
 		}
 	}
 	// 打开钱包
-	wallet := NewWallets().Gather[from]
+	// wallet := wallet.NewWallets().Gather[from]
 	// 获取公钥、私钥
-	priKey := wallet.PriKey
-	pubKey := wallet.PubKey
-	var inputs []Input
-	var outputs []Output
-	// 找到合适的UTXO
-	UTXOs, balance := bc.FindNeedUTXOs(pubKey, amount)
-	if balance < amount {
-		// 余额不足
-		fmt.Println("余额不足创建交易失败")
-		return &TX{}
-	} else {
-		outputs = append(outputs, *NewOutput(amount, to))
-		// 余额足够支付，则创建input和output
-		for TXId, indexes := range UTXOs {
-			for _, i := range indexes {
-				inputs = append(inputs, Input{[]byte(TXId), i, nil, pubKey})
-			}
-		}
-		if balance > amount {
-			outputs = append(outputs, *NewOutput(balance-amount, from))
-		}
-	}
+	// priKey := wallet.PriKey
+
 	tx := TX{nil, inputs, outputs}
-	tx.Id = Serialize(tx)
-	bc.SignTX(&tx, priKey)
+	tx.Id = utils.Serialize(tx)
+	// 交易签名
 	fmt.Println("转账成功")
 	return &tx
 }
@@ -125,7 +77,7 @@ func (tx *TX) Sign(priKey *ecdsa.PrivateKey, preTXs map[string]*TX) {
 		// TX的SetID函数就是对交易的哈希
 		// 所以我们可以使用交易id作为我们签名的内容
 		// 3.生成要签名的数据（哈希）
-		txCopy.Id = Serialize(txCopy)
+		txCopy.Id = utils.Serialize(txCopy)
 		Id := txCopy.Id
 		// 清理，原理同上
 		// input.PubKey = nil
@@ -155,7 +107,7 @@ func (tx *TX) Verify(preTXs map[string]*TX) bool {
 		// 4.找到output的公钥哈希，赋值给txCopy对应的input
 		txCopy.Inputs[i].PrePubKey = output.PubKeyHash
 		// 5.还原签名数据
-		txCopy.Id = Serialize(txCopy)
+		txCopy.Id = utils.Serialize(txCopy)
 		// 清理动作，重要！！！
 		txCopy.Inputs[i].PrePubKey = nil
 

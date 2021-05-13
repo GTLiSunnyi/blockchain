@@ -1,63 +1,94 @@
 package main
 
 import (
-	"flag"
-	"fmt"
 	"net"
 
+	"github.com/boltdb/bolt"
+
+	"mybc/accounts"
 	"mybc/blockchain"
 	"mybc/cmd"
+	"mybc/types"
 	"mybc/wallet"
 )
 
-var IP string
-var Port string
-var IsSuper bool
-
 func main() {
-	defer BC.DB.Close()
-	var addr string
+	key := wallet.NewWallet()
 
-	flag.StringVar(&IP, "ip", "", "-ip=:127.0.0.1")
-	flag.StringVar(&Port, "port", "", "-port=:8080")
-	flag.StringVar(&addr, "addr", "", "-addr=abc")
-	flag.BoolVar(&IsSuper, "isSuper", false, "-isSuper")
-	flag.Parse()
-
-	if IP == "" && Port == "" && addr == "" {
-		return
+	// 创建超级管理员数据库
+	db1, err := bolt.Open(types.DBName, 0600, nil)
+	if err != nil {
+		panic(err)
 	}
-	if addr == "" && Port == "" || IP == "" {
-		return
-	} else {
-		ip := checkIP()
-		if ip == "" {
-			fmt.Errorf("Unable to get a avilable ip")
-			return
+	db1.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(types.SuperAccountBucketName))
+		if b == nil {
+			// 桶不存在则创建
+			b, err = tx.CreateBucket([]byte(types.SuperAccountBucketName))
+			if err != nil {
+				panic(err)
+			}
 		}
+
+		b.Put([]byte("SuperAccont"), []byte(key.GetAddress()))
+		return nil
+	})
+
+	types.CurrentUsers = key.GetAddress()
+
+	// 创建管理员数据库
+	db2, err := bolt.Open(types.DBName, 0600, nil)
+	if err != nil {
+		panic(err)
+	}
+	db2.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(types.AdminAccountBucketName))
+		if b == nil {
+			// 桶不存在则创建
+			b, err = tx.CreateBucket([]byte(types.AdminAccountBucketName))
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		return nil
+	})
+
+	// 创建普通节点数据库
+	db3, err := bolt.Open(types.DBName, 0600, nil)
+	if err != nil {
+		panic(err)
+	}
+	db3.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(types.NodeAccountBucketName))
+		if b == nil {
+			// 桶不存在则创建
+			b, err = tx.CreateBucket([]byte(types.NodeAccountBucketName))
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		return nil
+	})
+
+	// 创建区块链
+	blockchain.BlockChain = blockchain.NewBC()
+
+	accounts.SuperAdmin = &accounts.Super{Key: key,
+		SuperDB: db1,
+		AdminDB: db2,
+		NodeDB:  db3,
 	}
 
-	if !IsSuper {
-		IsSuper = true
-	}
-	if addr == "" {
-		key = wallet.NewWallet()
-		Accounts = append(Accounts, key.GetAddress())
-		addr = key.GetAddress()
-	} else if !isInAccounts(addr) {
-		fmt.Errorf("addr is not in the system!")
-		return
-	}
+	defer db1.Close()
+	defer db2.Close()
+	defer db3.Close()
+	defer blockchain.BlockChain.DB.Close()
 
-	comond := cmd.Cmd{}
-	if addr == SuperAccount {
-		// 创建链
-		BC = blockchain.NewBC()
-		// 创建创世块
-		BC.AddBlock(false)
-	}
-
-	comond.Run(addr)
+	// 运行区块链
+	command := cmd.Cmd{}
+	command.SuperRun()
 }
 
 func checkIP() string {
@@ -75,18 +106,4 @@ func checkIP() string {
 		}
 	}
 	return ""
-}
-
-func isInAccounts(addr string) bool {
-	for _, v := range Accounts {
-		if v == addr {
-			return true
-		}
-	}
-	for _, v := range AdminAccounts {
-		if v == addr {
-			return true
-		}
-	}
-	return addr == SuperAccount
 }

@@ -9,10 +9,13 @@ import (
 
 	"github.com/boltdb/bolt"
 
+	"mybc/accounts"
 	"mybc/tx"
 	"mybc/utils"
 	"mybc/wallet"
 )
+
+var BlockChain *BC
 
 type BC struct {
 	DB            *bolt.DB
@@ -28,6 +31,7 @@ func NewBC() *BC {
 	if err != nil {
 		log.Panic(err)
 	}
+
 	db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(BlockBucketName))
 		if b == nil {
@@ -39,6 +43,9 @@ func NewBC() *BC {
 		}
 		return nil
 	})
+
+	CreateBlock(accounts.SuperAdmin.Key.GetAddress(), accounts.SuperAdmin.Key.PriKey, nil, nil)
+
 	return &BC{DB: db}
 }
 
@@ -78,7 +85,7 @@ func (bc *BC) AddBlock(isTransfer bool) {
 		}
 	}
 	// 最后一个区块的哈希就是当前区块的PreBlockHash
-	block, isVaild := NewBlock(txs, bc.LastBlockHash)
+	block, isVaild := CreateBlock(txs, bc.LastBlockHash)
 	if isVaild {
 		bc.DB.Update(func(tx *bolt.Tx) error {
 			b := tx.Bucket([]byte(BlockBucketName))
@@ -163,7 +170,7 @@ func (bc *BC) FindMyUtoxs(pubKey []byte) []UTXOInfo {
 					}
 				}
 				// 4.找到属于我的所有output
-				if bytes.Equal(output.PubKeyHash, tx.HashPubKey(pubKey)) {
+				if bytes.Equal(output.PubKeyHash, wallet.HashPubKey(pubKey)) {
 					utxoinfo := UTXOInfo{tx.Id, int64(i), output}
 					UTXOInfos = append(UTXOInfos, utxoinfo)
 				}
@@ -174,43 +181,6 @@ func (bc *BC) FindMyUtoxs(pubKey []byte) []UTXOInfo {
 		}
 	}
 	return UTXOInfos
-}
-
-// 找到付款人合适的UTXOs
-func (bc *BC) FindNeedUTXOs(pubKey []byte, amount float64) (map[string][]int64, float64) {
-	needUtxos := make(map[string][]int64) // 标识能用的utxo, //返回的结构
-	var resValue float64                  // 统计的金额
-	// 复用FindMyUtxo函数，这个函数已经包含了所有信息
-	utxoinfos := bc.FindMyUtoxs(pubKey)
-	for _, utxoinfo := range utxoinfos {
-		key := string(utxoinfo.TXId)
-		needUtxos[key] = append(needUtxos[key], int64(utxoinfo.Index))
-		resValue += utxoinfo.Output.Amount
-		// 2.找到足够的金额则返回，否则就会最终返回账户余额
-		if resValue >= amount {
-			break
-		}
-	}
-	return needUtxos, resValue
-}
-
-// 获取余额
-func (bc *BC) GetBalance(owner string) (float64, bool) {
-	Wallet, ok := wallet.NewWallets().Gather[owner]
-	if !wallet.IsValidAddress(owner) {
-		fmt.Println("地址错误")
-		return 0.0, false
-	} else if !ok {
-		fmt.Println("该地址不存在")
-		return 0.0, false
-	}
-	pubKey := Wallet.PubKey
-	utxos := bc.FindMyUtoxs(pubKey)
-	var balance = 0.00
-	for _, utxo := range utxos {
-		balance += utxo.Output.Amount
-	}
-	return balance, true
 }
 
 // 交易签名

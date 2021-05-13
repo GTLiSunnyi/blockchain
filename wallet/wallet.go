@@ -14,7 +14,7 @@ import (
 )
 
 type Wallet struct {
-	PubKey []byte
+	PubKey *ecdsa.PublicKey
 	PriKey *ecdsa.PrivateKey
 }
 
@@ -26,9 +26,9 @@ func NewWallet() *Wallet {
 		log.Panic(err)
 	}
 	// 由私钥创建公钥
-	pubKeyRaw /*原始公钥*/ := priKey.PublicKey
-	pubKey := append(pubKeyRaw.X.Bytes(), pubKeyRaw.Y.Bytes()...)
-	return &Wallet{pubKey, priKey}
+	pubKey /*原始公钥*/ := priKey.PublicKey
+
+	return &Wallet{&pubKey, priKey}
 }
 
 // 获取钱包地址
@@ -67,8 +67,8 @@ func IsValidAddress(address string) bool {
 }
 
 // 将公钥处理为公钥哈希
-func HashPubKey(pubKey []byte) []byte {
-	hash := sha256.Sum256(pubKey)
+func HashPubKey(pubKey *ecdsa.PublicKey) []byte {
+	hash := sha256.Sum256(append(pubKey.X.Bytes(), pubKey.Y.Bytes()...))
 	// 生成publicKeyHash
 	// 1.创建hash160对象
 	rip160Hash := ripemd160.New()

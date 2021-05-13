@@ -1,0 +1,3 @@
+package tx
+
+func GetTx() {}
