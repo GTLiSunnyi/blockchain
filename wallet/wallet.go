@@ -3,32 +3,20 @@ package wallet
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	"log"
 
 	"github.com/btcsuite/btcutil/base58"
 	"golang.org/x/crypto/ripemd160"
+
+	"mybc/types"
 )
 
 type Wallet struct {
+	types.AccountType
 	PubKey *ecdsa.PublicKey
 	PriKey *ecdsa.PrivateKey
-}
-
-func NewWallet() *Wallet {
-	// 创建私钥
-	priKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		fmt.Println("创建私钥失败，创建钱包失败")
-		log.Panic(err)
-	}
-	// 由私钥创建公钥
-	pubKey /*原始公钥*/ := priKey.PublicKey
-
-	return &Wallet{&pubKey, priKey}
 }
 
 // 获取钱包地址

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"time"
 
 	"mybc/accounts"
 	"mybc/query"
@@ -17,10 +16,14 @@ func (cmd *Cmd) SuperRun() {
 	const prompt = `
 *******************
 use      切换用户
+addPermissions 增加权限
+createNode 创建节点
 query    查询区块、节点
 quit     退出程序
 *******************
 `
+
+	go run()
 
 	var order string // 接收命令
 	fmt.Println(prompt)
@@ -32,6 +35,10 @@ quit     退出程序
 			fmt.Println("请输入切换用户的地址：")
 			fmt.Scan(&order)
 			cmd.SwitchUsers(true, order)
+		case "addPermissions":
+
+		case "createNode":
+
 		case "query":
 			query.Query()
 		case "quit":
@@ -59,24 +66,24 @@ quit     退出程序
 		fmt.Scan(&order)
 		switch order {
 		case "send":
-			bc.addBlock(true)
+			// bc.addBlock(true)
 		case "query":
-			it := bc.NewIterator()
-			// 打印区块链
-			for {
-				block := it.Run()
-				fmt.Println("++++++++++++++++++++++++++++++++++++++++++++++++++++")
-				fmt.Printf("preBlockHash: %v\n", block.PreBlockHash)
-				fmt.Printf("merkleRoot: %v\n", block.MerkleRoot)
-				timeFormat := time.Unix(int64(block.TimeStamp), 0).Format("2006-01-02 15:04:05")
-				fmt.Printf("timeStamp : %s\n", timeFormat)
-				fmt.Printf("difficulty: %v\n", block.Difficulty)
-				fmt.Printf("nonce: %v\n", block.Nonce)
-				fmt.Printf("hash: %v\n", block.Hash)
-				if block.PreBlockHash == nil {
-					break
-				}
-			}
+			// it := bc.NewIterator()
+			// // 打印区块链
+			// for {
+			// 	block := it.Run()
+			// 	fmt.Println("++++++++++++++++++++++++++++++++++++++++++++++++++++")
+			// 	fmt.Printf("preBlockHash: %v\n", block.PreBlockHash)
+			// 	fmt.Printf("merkleRoot: %v\n", block.MerkleRoot)
+			// 	timeFormat := time.Unix(int64(block.TimeStamp), 0).Format("2006-01-02 15:04:05")
+			// 	fmt.Printf("timeStamp : %s\n", timeFormat)
+			// 	fmt.Printf("difficulty: %v\n", block.Difficulty)
+			// 	fmt.Printf("nonce: %v\n", block.Nonce)
+			// 	fmt.Printf("hash: %v\n", block.Hash)
+			// 	if block.PreBlockHash == nil {
+			// 		break
+			// 	}
+			// }
 		case "quit":
 			return
 		default:
@@ -104,37 +111,37 @@ quit     退出程序
 		fmt.Scan(&order)
 		switch order {
 		case "send":
-			bc.addBlock(true)
-		case "balance":
-			fmt.Println("请输入获取对象")
-			fmt.Scan(&order)
-			balance, isOrderExist := bc.GetBalance(order)
-			if isOrderExist {
-				fmt.Printf("%v的余额为%v\n", order, balance)
-			}
+		// 	bc.addBlock(true)
+		// case "balance":
+		// 	fmt.Println("请输入获取对象")
+		// 	fmt.Scan(&order)
+		// 	balance, isOrderExist := bc.GetBalance(order)
+		// 	if isOrderExist {
+		// 		fmt.Printf("%v的余额为%v\n", order, balance)
+		// 	}
 		case "wallet":
-			wallets := NewWallets()
-			wallets.CreateWallets()
-		case "list":
-			wallets := NewWallets()
-			wallets.GetList()
-		case "print":
-			it := bc.NewIterator()
-			// 打印区块链
-			for {
-				block := it.Run()
-				fmt.Println("++++++++++++++++++++++++++++++++++++++++++++++++++++")
-				fmt.Printf("preBlockHash: %v\n", block.PreBlockHash)
-				fmt.Printf("merkleRoot: %v\n", block.MerkleRoot)
-				timeFormat := time.Unix(int64(block.TimeStamp), 0).Format("2006-01-02 15:04:05")
-				fmt.Printf("timeStamp : %s\n", timeFormat)
-				fmt.Printf("difficulty: %v\n", block.Difficulty)
-				fmt.Printf("nonce: %v\n", block.Nonce)
-				fmt.Printf("hash: %v\n", block.Hash)
-				if block.PreBlockHash == nil {
-					break
-				}
-			}
+		// 	wallets := NewWallets()
+		// 	wallets.CreateWallets()
+		// case "list":
+		// 	wallets := NewWallets()
+		// 	wallets.GetList()
+		// case "print":
+		// 	it := bc.NewIterator()
+		// 	// 打印区块链
+		// 	for {
+		// 		block := it.Run()
+		// 		fmt.Println("++++++++++++++++++++++++++++++++++++++++++++++++++++")
+		// 		fmt.Printf("preBlockHash: %v\n", block.PreBlockHash)
+		// 		fmt.Printf("merkleRoot: %v\n", block.MerkleRoot)
+		// 		timeFormat := time.Unix(int64(block.TimeStamp), 0).Format("2006-01-02 15:04:05")
+		// 		fmt.Printf("timeStamp : %s\n", timeFormat)
+		// 		fmt.Printf("difficulty: %v\n", block.Difficulty)
+		// 		fmt.Printf("nonce: %v\n", block.Nonce)
+		// 		fmt.Printf("hash: %v\n", block.Hash)
+		// 		if block.PreBlockHash == nil {
+		// 			break
+		// 		}
+		// 	}
 		case "quit":
 			return
 		default:

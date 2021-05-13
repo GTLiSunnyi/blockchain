@@ -2,12 +2,20 @@ package wallet
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/rand"
 	"encoding/gob"
 	"fmt"
 	"io/ioutil"
+	"log"
+	"mybc/types"
 	"os"
+
+	"github.com/boltdb/bolt"
 )
+
+var Ws *Wallets
 
 // 所有钱包集合
 // Wallets对外，WalletKeyPair对内，Wallets调用WalletKeyPair
@@ -18,20 +26,29 @@ type Wallets struct {
 // 钱包集合文件名字
 const FileName = "./wallets.dat"
 
-func NewWallets() *Wallets {
-	var ws Wallets
-	ws.Gather = make(map[string]*Wallet)
-	ws.LoadFile()
-	return &ws
+func (ws *Wallets) NewWallets() {
+	Ws.Gather = make(map[string]*Wallet)
+	Ws.LoadFile()
 }
 
-func (ws *Wallets) CreateWallets() string {
+func (ws *Wallets) NewWallet() *Wallet {
 	// 创建钱包，并保存到钱包集合中，最后保存到本地文件
-	wallet := NewWallet()
+	// 创建私钥
+	priKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		fmt.Println("创建私钥失败，创建钱包失败")
+		log.Panic(err)
+	}
+	// 由私钥创建公钥
+	pubKey := priKey.PublicKey
+
+	wallet := &Wallet{types.NodeTypes, &pubKey, priKey}
+
 	address := wallet.GetAddress()
-	ws.Gather[address] = wallet
-	ws.SaveFile()
-	return address
+	Ws.Gather[address] = wallet
+	Ws.SaveFile()
+
+	return wallet
 }
 
 // 打印钱包集合
@@ -75,4 +92,29 @@ func (ws *Wallets) SaveFile() {
 	if err != nil {
 		fmt.Println("保存到本地失败")
 	}
+}
+
+// 创建普通节点
+func CreateNodeAccount() string {
+	key := Ws.NewWallet()
+
+	db, err := bolt.Open(types.DBName, 0600, nil)
+	if err != nil {
+		panic(err)
+	}
+	db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(types.NodeAccountBucketName))
+		if b == nil {
+			// 桶不存在则创建
+			b, err = tx.CreateBucket([]byte(types.NodeAccountBucketName))
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		b.Put([]byte("NodeAccount"), []byte(key.GetAddress()))
+		return nil
+	})
+
+	return key.GetAddress()
 }

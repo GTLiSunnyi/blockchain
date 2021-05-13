@@ -9,14 +9,19 @@ import (
 
 func TestSignature(t *testing.T) {
 	var block Block
-	block.MerkleRoot = []byte("1234567890-=asdfghjklzxcvbnm,./")
-	block.TXs = &[]tx.TX{tx.TX{Id: []byte("asdfghjkl")}}
-	var wallet = wallet.NewWallet()
-	_ = block.setMerkleAndGetSignature(wallet.PriKey)
-	isValid := block.IsValid(wallet.PubKey)
+	block.TXs = []tx.TX{*tx.NewFileTx([]byte("asdfghjk"))}
+	var w = wallet.Ws.NewWallet()
+	block.setMerkleAndTxSignature(w.PriKey)
+	isValid := block.IsValid(w.PubKey)
 	if isValid {
 		t.Log("success")
 	} else {
 		t.Error("failed")
+	}
+
+	block.setMerkleAndTxSignature(w.PriKey)
+	isValid = block.IsValid(wallet.Ws.NewWallet().PubKey)
+	if !isValid {
+		t.Log("success")
 	}
 }

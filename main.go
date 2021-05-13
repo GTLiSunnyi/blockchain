@@ -1,8 +1,6 @@
 package main
 
 import (
-	"net"
-
 	"github.com/boltdb/bolt"
 
 	"mybc/accounts"
@@ -13,7 +11,10 @@ import (
 )
 
 func main() {
-	key := wallet.NewWallet()
+	wallet.Ws.NewWallets()
+
+	key := wallet.Ws.NewWallet()
+	types.CurrentUsers = key.GetAddress()
 
 	// 创建超级管理员数据库
 	db1, err := bolt.Open(types.DBName, 0600, nil)
@@ -29,12 +30,9 @@ func main() {
 				panic(err)
 			}
 		}
-
-		b.Put([]byte("SuperAccont"), []byte(key.GetAddress()))
+		b.Put([]byte("SuperAccont"), []byte(types.CurrentUsers))
 		return nil
 	})
-
-	types.CurrentUsers = key.GetAddress()
 
 	// 创建管理员数据库
 	db2, err := bolt.Open(types.DBName, 0600, nil)
@@ -75,8 +73,7 @@ func main() {
 	// 创建区块链
 	blockchain.BlockChain = blockchain.NewBC()
 
-	accounts.SuperAdmin = &accounts.Super{Key: key,
-		SuperDB: db1,
+	accounts.SuperAdmin = &accounts.Super{Address: types.CurrentUsers,
 		AdminDB: db2,
 		NodeDB:  db3,
 	}
@@ -89,21 +86,4 @@ func main() {
 	// 运行区块链
 	command := cmd.Cmd{}
 	command.SuperRun()
-}
-
-func checkIP() string {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return ""
-	}
-
-	for _, address := range addrs {
-		// 检查ip地址判断是否回环地址
-		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String()
-			}
-		}
-	}
-	return ""
 }
