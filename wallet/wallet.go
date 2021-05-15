@@ -10,7 +10,7 @@ import (
 	"github.com/btcsuite/btcutil/base58"
 	"golang.org/x/crypto/ripemd160"
 
-	"mybc/types"
+	"github.com/GTLiSunnyi/blockchain/types"
 )
 
 type Wallet struct {
@@ -33,6 +33,7 @@ func (wallet *Wallet) GetAddress() string {
 	// base58处理
 	address := base58.Encode(payload)
 	fmt.Println("钱包地址为：", address)
+
 	return address
 }
 

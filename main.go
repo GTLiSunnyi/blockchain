@@ -1,19 +1,49 @@
 package main
 
 import (
+	"log"
+
 	"github.com/boltdb/bolt"
 
-	"mybc/blockchain"
-	"mybc/cmd"
-	"mybc/types"
-	"mybc/wallet"
+	"github.com/GTLiSunnyi/blockchain/blockchain"
+	"github.com/GTLiSunnyi/blockchain/cmd"
+	"github.com/GTLiSunnyi/blockchain/types"
+	"github.com/GTLiSunnyi/blockchain/wallet"
 )
 
 func main() {
-	ws := wallet.NewWallets()
+	db, err := bolt.Open(types.DBName, 0600, nil)
+	if err != nil {
+		log.Panic(err)
+	}
+	defer db.Close()
+	db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(types.AccountBucketName))
+		if b == nil {
+			// 桶不存在则创建
+			b, err = tx.CreateBucket([]byte(types.AccountBucketName))
+			if err != nil {
+				log.Panic(err)
+			}
+		}
+		return nil
+	})
+	db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(types.BlockChainBucketName))
+		if b == nil {
+			// 桶不存在则创建
+			b, err = tx.CreateBucket([]byte(types.BlockChainBucketName))
+			if err != nil {
+				log.Panic(err)
+			}
+		}
+		return nil
+	})
 
-	w := ws.NewWallet()
-	types.CurrentUsers = w.GetAddress()
+	ws := wallet.NewWallets(db)
+
+	_, address := ws.NewWallet()
+	types.CurrentUsers = address
 
 	// 账户数据库
 	ws.DB.Update(func(tx *bolt.Tx) error {
@@ -32,10 +62,8 @@ func main() {
 	})
 
 	// 创建区块链
-	bc := blockchain.NewBC(ws)
-
-	defer bc.DB.Close()
-	defer ws.DB.Close()
+	bc := blockchain.NewBC(address, ws, db)
+	bc.RunBC(ws)
 
 	// 运行区块链
 	command := cmd.Cmd{}

@@ -3,45 +3,28 @@ package blockchain
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/boltdb/bolt"
 
-	"mybc/tx"
-	"mybc/types"
-	"mybc/wallet"
+	"github.com/GTLiSunnyi/blockchain/tx"
+	"github.com/GTLiSunnyi/blockchain/types"
+	"github.com/GTLiSunnyi/blockchain/wallet"
 )
 
 type BC struct {
 	DB     *bolt.DB
 	TxPool []tx.TX
 	Iterator
-	LastBlockHash []byte
+	LastBlockHash [32]byte
 }
 
 // 创建区块链
-func NewBC(ws *wallet.Wallets) *BC {
-	db, err := bolt.Open(types.DBName, 0600, nil)
-	if err != nil {
-		log.Panic(err)
-	}
+func NewBC(address string, ws *wallet.Wallets, db *bolt.DB) *BC {
+	var block Block
+	bc := &BC{DB: db, LastBlockHash: [32]byte{}, TxPool: []tx.TX{}}
 
-	db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(types.BlockChainBucketName))
-		if b == nil {
-			// 桶不存在则创建
-			b, err = tx.CreateBucket([]byte(types.BlockChainBucketName))
-			if err != nil {
-				log.Panic(err)
-			}
-		}
-		return nil
-	})
-
-	var block *Block
-	go CreateBlock(types.CurrentUsers, ws.Gather[types.CurrentUsers].PriKey, nil, []byte(""), block, nil)
-	bc := &BC{DB: db, LastBlockHash: []byte("")}
+	bc.CreateBlock(address, ws.Gather[types.CurrentUsers].PriKey, nil, [32]byte{}, &block, nil)
 
 	return bc
 }
@@ -50,7 +33,7 @@ func (bc *BC) RunBC(ws *wallet.Wallets) {
 	it := bc.NewIterator()
 
 	// 定时执行共识任务
-	ticker := time.NewTicker(time.Duration(types.Interval) * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	go func() {
 		for _ = range ticker.C {
 			it.Run(bc, ws)
@@ -86,9 +69,8 @@ func (it *Iterator) Run(bc *BC, ws *wallet.Wallets) {
 		it.CurrentPackagerNum++
 	}
 
-	var block *Block
-	go CreateBlock(currentPackager, ws.Gather[currentPackager].PriKey, bc.TxPool, bc.LastBlockHash, block, it.Chan)
-	it.Chan <- true
+	var block Block
+	go bc.CreateBlock(currentPackager, ws.Gather[currentPackager].PriKey, bc.TxPool, bc.LastBlockHash, &block, it.Chan)
 
 	go func() {
 		select {
@@ -97,13 +79,13 @@ func (it *Iterator) Run(bc *BC, ws *wallet.Wallets) {
 				it.DB.View(func(tx *bolt.Tx) error {
 					b := tx.Bucket([]byte(types.BlockChainBucketName))
 					blockinfo, _ := json.Marshal(block)
-					b.Put(bc.LastBlockHash, blockinfo)
+					b.Put(bc.LastBlockHash[:], blockinfo)
 
-					bc.LastBlockHash = block.Hash
+					bc.LastBlockHash = block.Header.Hash
 					return nil
 				})
 			}
-		case <-time.After(time.Second * time.Duration(types.Interval)):
+		case <-time.After(time.Second * 5):
 			// 多少秒内没处理完毕
 			// 取消这次打包，并撤销管理员职位
 			it.DB.Update(func(tx *bolt.Tx) error {
@@ -112,7 +94,7 @@ func (it *Iterator) Run(bc *BC, ws *wallet.Wallets) {
 				return nil
 			})
 
-			fmt.Errorf("未在指定时间内打包完成，你已经失去管理员资格！")
+			fmt.Errorf("未在指定时间内打包完成，你已经失去管理员资格！\n")
 		}
 	}()
 }

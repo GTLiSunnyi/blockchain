@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 
-	"mybc/types"
-	"mybc/wallet"
+	"github.com/GTLiSunnyi/blockchain/types"
+	"github.com/GTLiSunnyi/blockchain/wallet"
 )
 
 type Cmd struct{}
@@ -49,6 +49,7 @@ quit           退出程序
 			switch order {
 			case "account":
 				ws.QueryAccount()
+			case "block":
 			default:
 				fmt.Println("请输入正确的命令")
 			}

@@ -1,20 +1,38 @@
 package blockchain
 
 import (
+	"log"
 	"testing"
 
-	"mybc/tx"
-	"mybc/wallet"
+	"github.com/boltdb/bolt"
+
+	"github.com/GTLiSunnyi/blockchain/tx"
+	"github.com/GTLiSunnyi/blockchain/types"
+	"github.com/GTLiSunnyi/blockchain/wallet"
 )
 
 func TestSignature(t *testing.T) {
 	var block Block
 	block.TXs = []tx.TX{*tx.NewFileTx([]byte("asdfghjk"))}
 
-	var ws = wallet.NewWallets()
-	var w = ws.NewWallet()
+	db, err := bolt.Open("test", 0600, nil)
+	db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(types.AccountBucketName))
+		if b == nil {
+			// 桶不存在则创建
+			b, err = tx.CreateBucket([]byte(types.AccountBucketName))
+			if err != nil {
+				log.Panic(err)
+			}
+		}
+		return nil
+	})
+	defer db.Close()
 
-	block.setMerkleAndTxSignature(w.PriKey)
+	var ws = wallet.NewWallets(db)
+	var w, _ = ws.NewWallet()
+
+	block.Sign(&block.TXs[0], w.PriKey)
 	isValid := block.IsValid(w.PubKey)
 	if isValid {
 		t.Log("success")
@@ -22,8 +40,8 @@ func TestSignature(t *testing.T) {
 		t.Error("failed")
 	}
 
-	block.setMerkleAndTxSignature(w.PriKey)
-	isValid = block.IsValid(ws.NewWallet().PubKey)
+	var newW, _ = ws.NewWallet()
+	isValid = block.IsValid(newW.PubKey)
 	if !isValid {
 		t.Log("success")
 	}

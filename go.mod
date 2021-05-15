@@ -1,4 +1,4 @@
-module mybc
+module github.com/GTLiSunnyi/blockchain
 
 go 1.16
 

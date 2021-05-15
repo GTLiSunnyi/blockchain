@@ -9,8 +9,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"mybc/types"
 	"os"
+
+	"github.com/GTLiSunnyi/blockchain/types"
 
 	"github.com/boltdb/bolt"
 )
@@ -22,16 +23,8 @@ type Wallets struct {
 	DB     *bolt.DB
 }
 
-// 钱包集合文件名字
-const FileName = "./wallets.dat"
-
-func NewWallets() *Wallets {
+func NewWallets(db *bolt.DB) *Wallets {
 	gather := make(map[string]*Wallet)
-
-	db, err := bolt.Open(types.DBName, 0600, nil)
-	if err != nil {
-		panic(err)
-	}
 
 	ws := &Wallets{Gather: gather, DB: db}
 	ws.LoadFile()
@@ -39,7 +32,7 @@ func NewWallets() *Wallets {
 	return ws
 }
 
-func (ws *Wallets) NewWallet() *Wallet {
+func (ws *Wallets) NewWallet() (*Wallet, string) {
 	// 创建钱包，并保存到钱包集合中，最后保存到本地文件
 	// 创建私钥
 	priKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -47,8 +40,11 @@ func (ws *Wallets) NewWallet() *Wallet {
 		fmt.Println("创建私钥失败，创建钱包失败")
 		log.Panic(err)
 	}
+
 	// 由私钥创建公钥
 	pubKey := priKey.PublicKey
+	fmt.Println("公钥为：", pubKey)
+
 	// pubKeyByte := append(pubKey.X.Bytes(), pubKey.Y.Bytes()...)
 	wallet := &Wallet{types.NodeTypes, &pubKey, priKey}
 
@@ -56,7 +52,7 @@ func (ws *Wallets) NewWallet() *Wallet {
 	ws.Gather[address] = wallet
 	ws.SaveFile()
 
-	return wallet
+	return wallet, address
 }
 
 // 查询所有的地址及用户权限
@@ -76,9 +72,9 @@ func (ws *Wallets) GetList() {
 // 读取本地文件
 func (ws *Wallets) LoadFile() {
 	// 读取本地文件，返回解码后的信息
-	_, err := os.Stat(FileName)
+	_, err := os.Stat(types.FileName)
 	if err == nil {
-		data, err := ioutil.ReadFile(FileName)
+		data, err := ioutil.ReadFile(types.FileName)
 		if err != nil {
 			fmt.Println("读取本地文件失败")
 			return
@@ -103,7 +99,7 @@ func (ws *Wallets) SaveFile() {
 	if err != nil {
 		fmt.Println("序列化失败")
 	}
-	err = ioutil.WriteFile(FileName, buffer.Bytes(), 0600)
+	err = ioutil.WriteFile(types.FileName, buffer.Bytes(), 0600)
 	if err != nil {
 		fmt.Println("保存到本地失败")
 	}
@@ -111,14 +107,9 @@ func (ws *Wallets) SaveFile() {
 
 // 创建普通节点
 func (ws *Wallets) CreateNodeAccount() string {
-	key := ws.NewWallet()
-	address := key.GetAddress()
+	_, address := ws.NewWallet()
 
-	db, err := bolt.Open(types.DBName, 0600, nil)
-	if err != nil {
-		panic(err)
-	}
-	db.Update(func(tx *bolt.Tx) error {
+	ws.DB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(types.AccountBucketName))
 		b.Put([]byte(address), []byte(types.NodeTypes))
 		return nil
