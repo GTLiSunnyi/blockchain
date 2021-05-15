@@ -61,12 +61,13 @@ func main() {
 		return nil
 	})
 
+	// 创建cmd
+	command := cmd.NewCmd()
+
 	// 创建区块链
 	bc := blockchain.NewBC(address, ws, db)
-	bc.RunBC(ws)
+	bc.RunBC(ws, command)
 
-	// 运行区块链
-	command := cmd.Cmd{}
 	command.SuperRun(ws)
 
 	select {}

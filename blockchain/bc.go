@@ -7,6 +7,7 @@ import (
 
 	"github.com/boltdb/bolt"
 
+	"github.com/GTLiSunnyi/blockchain/cmd"
 	"github.com/GTLiSunnyi/blockchain/tx"
 	"github.com/GTLiSunnyi/blockchain/types"
 	"github.com/GTLiSunnyi/blockchain/wallet"
@@ -29,14 +30,21 @@ func NewBC(address string, ws *wallet.Wallets, db *bolt.DB) *BC {
 	return bc
 }
 
-func (bc *BC) RunBC(ws *wallet.Wallets) {
+func (bc *BC) RunBC(ws *wallet.Wallets, cmd *cmd.Cmd) {
 	it := bc.NewIterator()
 
 	// 定时执行共识任务
 	ticker := time.NewTicker(5 * time.Second)
 	go func() {
 		for _ = range ticker.C {
-			it.Run(bc, ws)
+			select {
+			case <-cmd.ChanList:
+
+			default:
+				it.UpdatePackagers(bc)
+				it.Run(bc, ws)
+			}
+
 		}
 	}()
 }
@@ -51,7 +59,7 @@ type Iterator struct {
 
 func (bc *BC) NewIterator() *Iterator {
 	it := Iterator{
-		CurrentPackagerNum: 1,
+		CurrentPackagerNum: 0,
 		DB:                 bc.DB,
 		Chan:               make(chan bool),
 	}
@@ -63,11 +71,12 @@ func (bc *BC) NewIterator() *Iterator {
 // 运行迭代器
 func (it *Iterator) Run(bc *BC, ws *wallet.Wallets) {
 	currentPackager := it.Packagers[it.CurrentPackagerNum]
-	if len(it.Packagers) == it.CurrentPackagerNum {
-		it.CurrentPackagerNum = 0
-	} else {
+	defer func() {
 		it.CurrentPackagerNum++
-	}
+		if len(it.Packagers) == it.CurrentPackagerNum {
+			it.CurrentPackagerNum = 0
+		}
+	}()
 
 	var block Block
 	go bc.CreateBlock(currentPackager, ws.Gather[currentPackager].PriKey, bc.TxPool, bc.LastBlockHash, &block, it.Chan)

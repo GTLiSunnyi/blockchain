@@ -2,17 +2,26 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/GTLiSunnyi/blockchain/types"
 	"github.com/GTLiSunnyi/blockchain/wallet"
 )
 
-type Cmd struct{}
+type Cmd struct {
+	ChanList chan string
+}
+
+func NewCmd() *Cmd {
+	cmd := &Cmd{make(chan string, 100)}
+	return cmd
+}
 
 func (cmd *Cmd) SuperRun(ws *wallet.Wallets) {
 	// 提示信息
 	const prompt = `
 *******************************
+add            添加用户
 use            切换用户         
 addPms         增加权限       
 createNode     创建节点       
@@ -26,11 +35,14 @@ quit           退出程序
 	for {
 		fmt.Scan(&order)
 		switch order {
+		case "add":
 		case "use":
 			// 切换用户
 			fmt.Println("请输入切换用户的地址：")
+			cmd.ChanList <- "stop"
 			fmt.Scan(&order)
 			cmd.SwitchUsers(true, ws, order)
+			cmd.ChanList <- "run"
 		case "addPms":
 			fmt.Println("请输入切换用户的地址：")
 			fmt.Scan(&order)
@@ -55,7 +67,7 @@ quit           退出程序
 			}
 		case "quit":
 			fmt.Println("exit...")
-			return
+			os.Exit(-1)
 		default:
 			fmt.Println("请输入正确的命令")
 		}
@@ -117,7 +129,8 @@ quit      退出程序
 		// 		}
 		// 	}
 		case "quit":
-			return
+			fmt.Println("exit...")
+			os.Exit(-1)
 		default:
 			fmt.Println("请输入正确的命令")
 		}
@@ -165,7 +178,8 @@ quit        退出程序
 			// 	}
 			// }
 		case "quit":
-			return
+			fmt.Println("exit...")
+			os.Exit(-1)
 		default:
 			fmt.Println("请输入正确的命令")
 		}

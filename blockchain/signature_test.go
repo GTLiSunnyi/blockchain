@@ -32,8 +32,8 @@ func TestSignature(t *testing.T) {
 	var ws = wallet.NewWallets(db)
 	var w, _ = ws.NewWallet()
 
-	block.Sign(&block.TXs[0], w.PriKey)
-	isValid := block.IsValid(w.PubKey)
+	block.TXs[0].Sign(w.PriKey)
+	isValid := block.TXs[0].IsValid(w.PubKey)
 	if isValid {
 		t.Log("success")
 	} else {
@@ -41,7 +41,7 @@ func TestSignature(t *testing.T) {
 	}
 
 	var newW, _ = ws.NewWallet()
-	isValid = block.IsValid(newW.PubKey)
+	isValid = block.TXs[0].IsValid(newW.PubKey)
 	if !isValid {
 		t.Log("success")
 	}

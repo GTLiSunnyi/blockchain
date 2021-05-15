@@ -3,12 +3,9 @@ package blockchain
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"crypto/rand"
-	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/GTLiSunnyi/blockchain/tx"
@@ -32,12 +29,12 @@ type Header struct {
 }
 
 // 创建区块
-func (bc *BC) CreateBlock(addr string, prikey *ecdsa.PrivateKey, txs []tx.TX, preBlockHash [32]byte, block *Block, c chan bool) {
+func (bc *BC) CreateBlock(address string, prikey *ecdsa.PrivateKey, txs []tx.TX, preBlockHash [32]byte, block *Block, c chan bool) {
 	var header = &Header{
 		PreBlockHash: preBlockHash,
 		TimeStamp:    uint64(time.Now().Unix()),
 		Interval:     5,
-		Address:      addr,
+		Address:      address,
 	}
 
 	block.Header = header
@@ -48,7 +45,8 @@ func (bc *BC) CreateBlock(addr string, prikey *ecdsa.PrivateKey, txs []tx.TX, pr
 	block.Header.Height = types.Height
 
 	types.Height++
-	fmt.Printf("打包完成，区块高度：%d，区块哈希：%s。\n", block.Header.Height, block.Header.Hash)
+	fmt.Printf("打包完成，区块高度：%d，区块哈希：%X。\n", block.Header.Height, block.Header.Hash)
+	fmt.Println("打包者地址：", address)
 
 	if c == nil {
 		return
@@ -60,48 +58,13 @@ func (bc *BC) CreateBlock(addr string, prikey *ecdsa.PrivateKey, txs []tx.TX, pr
 // 设置梅克尔根，取哈希后签名
 func (block *Block) setTxSignatureAndMerkle(prikey *ecdsa.PrivateKey, bc *BC) {
 	// 遍历交易
-	for i, tx := range block.TXs {
-		signature := block.Sign(&tx, prikey)
-		block.TXs[i].Signature = signature
+	for _, tx := range block.TXs {
+		tx.Sign(prikey)
 	}
 
 	bc.TxPool = nil
 
 	block.setMerkle()
-}
-
-// 对交易进行签名
-func (block *Block) Sign(tx *tx.TX, prikey *ecdsa.PrivateKey) [][]byte {
-	hashText := sha1.Sum(append(tx.DenomTX, tx.FileTX...))
-
-	//数字签名
-	r, s, _ := ecdsa.Sign(rand.Reader, prikey, hashText[:])
-
-	rText, _ := r.MarshalText()
-	sText, _ := s.MarshalText()
-
-	return [][]byte{rText, sText}
-}
-
-// 校验交易签名是否正确
-func (block *Block) IsValid(pubkey *ecdsa.PublicKey) bool {
-	// 遍历交易
-	for _, tx := range block.TXs {
-		var r, s big.Int
-		r.UnmarshalText(tx.Signature[0])
-		s.UnmarshalText(tx.Signature[1])
-
-		tx.Signature = nil
-		hashText := sha1.Sum(append(tx.DenomTX, tx.FileTX...))
-
-		//认证
-		res := ecdsa.Verify(pubkey, hashText[:], &r, &s)
-		if !res {
-			return false
-		}
-	}
-
-	return true
 }
 
 // 生成区块哈希
