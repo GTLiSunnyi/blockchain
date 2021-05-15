@@ -4,9 +4,7 @@ var CurrentUsers string
 
 const DBName = "mybc.db"
 
-const SuperAccountBucketName = "SuperAccount"
-const AdminAccountBucketName = "AdminAccount"
-const NodeAccountBucketName = "NodeAccount"
+const AccountBucketName = "Account"
 
 const BlockChainBucketName = "block"
 

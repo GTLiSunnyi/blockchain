@@ -3,7 +3,6 @@ package utils
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"log"
 )
 
@@ -15,14 +14,4 @@ func UintToByte(num uint64) []byte {
 		log.Panic(err)
 	}
 	return buffer.Bytes()
-}
-
-// 序列化
-func Serialize(something interface{}) []byte {
-	data, err := json.Marshal(something)
-	if err != nil {
-		log.Println("序列化失败")
-		log.Panic(err)
-	}
-	return data
 }

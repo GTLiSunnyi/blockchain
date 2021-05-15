@@ -10,7 +10,10 @@ import (
 func TestSignature(t *testing.T) {
 	var block Block
 	block.TXs = []tx.TX{*tx.NewFileTx([]byte("asdfghjk"))}
-	var w = wallet.Ws.NewWallet()
+
+	var ws = wallet.NewWallets()
+	var w = ws.NewWallet()
+
 	block.setMerkleAndTxSignature(w.PriKey)
 	isValid := block.IsValid(w.PubKey)
 	if isValid {
@@ -20,7 +23,7 @@ func TestSignature(t *testing.T) {
 	}
 
 	block.setMerkleAndTxSignature(w.PriKey)
-	isValid = block.IsValid(wallet.Ws.NewWallet().PubKey)
+	isValid = block.IsValid(ws.NewWallet().PubKey)
 	if !isValid {
 		t.Log("success")
 	}

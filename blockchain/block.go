@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"mybc/tx"
+	"mybc/types"
 	"mybc/utils"
 )
 
@@ -26,22 +27,25 @@ type Header struct {
 }
 
 // 创建区块
-func CreateBlock(addr string, prikey *ecdsa.PrivateKey, txs []tx.TX, preBlockHash []byte) *Block {
-	var Header = Header{
+func CreateBlock(addr string, prikey *ecdsa.PrivateKey, txs []tx.TX, preBlockHash []byte, block *Block, c chan bool) {
+	var header = Header{
 		PreBlockHash: preBlockHash,
 		TimeStamp:    uint64(time.Now().Unix()),
-		Interval:     Interval,
+		Interval:     types.Interval,
 		Address:      addr,
 	}
 
-	block := Block{
-		Header: Header,
-		TXs:    txs,
-	}
+	block.Header = header
+	block.TXs = txs
 
 	block.setMerkleAndTxSignature(prikey)
 	block.Hash = block.GetBlockHash()
-	return &block
+
+	if c == nil {
+		return
+	} else {
+		c <- true
+	}
 }
 
 // 设置梅克尔根，取哈希后签名

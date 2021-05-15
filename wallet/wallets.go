@@ -15,20 +15,28 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-var Ws *Wallets
-
 // 所有钱包集合
 // Wallets对外，WalletKeyPair对内，Wallets调用WalletKeyPair
 type Wallets struct {
 	Gather map[string]*Wallet // 地址=>钱包
+	DB     *bolt.DB
 }
 
 // 钱包集合文件名字
 const FileName = "./wallets.dat"
 
-func (ws *Wallets) NewWallets() {
-	Ws.Gather = make(map[string]*Wallet)
-	Ws.LoadFile()
+func NewWallets() *Wallets {
+	gather := make(map[string]*Wallet)
+
+	db, err := bolt.Open(types.DBName, 0600, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	ws := &Wallets{Gather: gather, DB: db}
+	ws.LoadFile()
+
+	return ws
 }
 
 func (ws *Wallets) NewWallet() *Wallet {
@@ -41,14 +49,21 @@ func (ws *Wallets) NewWallet() *Wallet {
 	}
 	// 由私钥创建公钥
 	pubKey := priKey.PublicKey
-
+	// pubKeyByte := append(pubKey.X.Bytes(), pubKey.Y.Bytes()...)
 	wallet := &Wallet{types.NodeTypes, &pubKey, priKey}
 
 	address := wallet.GetAddress()
-	Ws.Gather[address] = wallet
-	Ws.SaveFile()
+	ws.Gather[address] = wallet
+	ws.SaveFile()
 
 	return wallet
+}
+
+// 查询所有的地址及用户权限
+func (ws *Wallets) QueryAccount() {
+	for k, v := range ws.Gather {
+		fmt.Println(k, v.AccountType)
+	}
 }
 
 // 打印钱包集合
@@ -95,26 +110,33 @@ func (ws *Wallets) SaveFile() {
 }
 
 // 创建普通节点
-func CreateNodeAccount() string {
-	key := Ws.NewWallet()
+func (ws *Wallets) CreateNodeAccount() string {
+	key := ws.NewWallet()
+	address := key.GetAddress()
 
 	db, err := bolt.Open(types.DBName, 0600, nil)
 	if err != nil {
 		panic(err)
 	}
 	db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(types.NodeAccountBucketName))
-		if b == nil {
-			// 桶不存在则创建
-			b, err = tx.CreateBucket([]byte(types.NodeAccountBucketName))
-			if err != nil {
-				panic(err)
-			}
-		}
-
-		b.Put([]byte("NodeAccount"), []byte(key.GetAddress()))
+		b := tx.Bucket([]byte(types.AccountBucketName))
+		b.Put([]byte(address), []byte(types.NodeTypes))
 		return nil
 	})
+	fmt.Println("新的普通节点的地址为：", address)
 
-	return key.GetAddress()
+	return address
+}
+
+func (ws *Wallets) AddPms(address string) {
+	if ws.IsInAccounts(address) {
+		ws.Gather[address].AccountType = types.AdminTypes
+	}
+}
+
+func (ws *Wallets) IsInAccounts(addrress string) bool {
+	if ws.Gather[addrress] != nil {
+		return true
+	}
+	return false
 }
