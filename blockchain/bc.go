@@ -34,7 +34,7 @@ func (bc *BC) RunBC(ws *wallet.Wallets, cmd *cmd.Cmd) {
 	it := bc.NewIterator()
 
 	// 定时执行共识任务
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(types.Interval)
 	go func() {
 		for _ = range ticker.C {
 			select {
@@ -105,7 +105,7 @@ func (it *Iterator) Run(bc *BC, ws *wallet.Wallets) {
 					fmt.Errorf("打包区块失败，你已经失去管理员资格！\n")
 				}
 			}
-		case <-time.After(time.Second * 5):
+		case <-time.After(types.Interval):
 			// 多少秒内没处理完毕
 			// 取消这次打包，并撤销管理员职位
 			it.DB.Update(func(tx *bolt.Tx) error {
