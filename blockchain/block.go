@@ -11,6 +11,7 @@ import (
 	"github.com/GTLiSunnyi/blockchain/tx"
 	"github.com/GTLiSunnyi/blockchain/types"
 	"github.com/GTLiSunnyi/blockchain/utils"
+	"github.com/GTLiSunnyi/blockchain/wallet"
 )
 
 type Block struct {
@@ -29,7 +30,7 @@ type Header struct {
 }
 
 // 创建区块
-func (bc *BC) CreateBlock(address string, prikey *ecdsa.PrivateKey, txs []tx.TX, preBlockHash [32]byte, block *Block, c chan bool) {
+func (bc *BC) CreateBlock(address string, ws *wallet.Wallets, preBlockHash [32]byte, block *Block, c chan bool, packagers []string) {
 	var header = &Header{
 		PreBlockHash: preBlockHash,
 		TimeStamp:    uint64(time.Now().Unix()),
@@ -38,21 +39,43 @@ func (bc *BC) CreateBlock(address string, prikey *ecdsa.PrivateKey, txs []tx.TX,
 	}
 
 	block.Header = header
-	block.TXs = txs
 
-	block.setTxSignatureAndMerkle(prikey, bc)
+	block.setTxSignatureAndMerkle(ws.Gather[address].PriKey, bc)
 	block.Header.Hash = block.GetBlockHash()
 	block.Header.Height = types.Height
 
 	types.Height++
-	fmt.Printf("打包完成，区块高度：%d，区块哈希：%X。\n", block.Header.Height, block.Header.Hash)
-	fmt.Println("打包者地址：", address)
 
-	if c == nil {
-		return
-	} else {
+	isOK := block.Verify(packagers, ws)
+
+	if isOK {
+		fmt.Printf("打包完成，区块高度：%d，区块哈希：%X。\n", block.Header.Height, block.Header.Hash)
+		fmt.Println("打包者地址：", address)
+		if c == nil {
+			return
+		}
 		c <- true
+	} else {
+		fmt.Println("区块验证失败，取消上链！")
+		c <- false
 	}
+}
+
+func (block *Block) Verify(packagers []string, ws *wallet.Wallets) bool {
+	for _, tx := range block.TXs {
+		var sum int
+		for _, packager := range packagers {
+			isTrue := tx.IsValid(ws.Gather[packager].PubKey)
+			if isTrue {
+				sum++
+			}
+		}
+		if sum < len(packagers)*2/3 {
+			return false
+		}
+	}
+
+	return true
 }
 
 // 设置梅克尔根，取哈希后签名

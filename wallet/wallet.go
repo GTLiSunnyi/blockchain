@@ -15,8 +15,9 @@ import (
 
 type Wallet struct {
 	types.AccountType
-	PubKey *ecdsa.PublicKey
-	PriKey *ecdsa.PrivateKey
+	Address string
+	PubKey  *ecdsa.PublicKey
+	PriKey  *ecdsa.PrivateKey
 }
 
 // 获取钱包地址
@@ -32,6 +33,8 @@ func (wallet *Wallet) GetAddress() string {
 	payload = append(payload, checksum...)
 	// base58处理
 	address := base58.Encode(payload)
+
+	wallet.Address = address
 	fmt.Println("钱包地址为：", address)
 
 	return address

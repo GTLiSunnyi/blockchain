@@ -46,9 +46,10 @@ func (ws *Wallets) NewWallet() (*Wallet, string) {
 	fmt.Println("公钥为：", pubKey)
 
 	// pubKeyByte := append(pubKey.X.Bytes(), pubKey.Y.Bytes()...)
-	wallet := &Wallet{types.NodeTypes, &pubKey, priKey}
 
+	wallet := &Wallet{types.NodeTypes, "", &pubKey, priKey}
 	address := wallet.GetAddress()
+
 	ws.Gather[address] = wallet
 	ws.SaveFile()
 

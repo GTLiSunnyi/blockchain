@@ -25,7 +25,7 @@ func NewBC(address string, ws *wallet.Wallets, db *bolt.DB) *BC {
 	var block Block
 	bc := &BC{DB: db, LastBlockHash: [32]byte{}, TxPool: []tx.TX{}}
 
-	bc.CreateBlock(address, ws.Gather[types.CurrentUsers].PriKey, nil, [32]byte{}, &block, nil)
+	bc.CreateBlock(address, ws, [32]byte{}, &block, nil, nil)
 
 	return bc
 }
@@ -41,7 +41,6 @@ func (bc *BC) RunBC(ws *wallet.Wallets, cmd *cmd.Cmd) {
 			case <-cmd.ChanList:
 
 			default:
-				it.UpdatePackagers(bc)
 				it.Run(bc, ws)
 			}
 
@@ -74,25 +73,37 @@ func (it *Iterator) Run(bc *BC, ws *wallet.Wallets) {
 	defer func() {
 		it.CurrentPackagerNum++
 		if len(it.Packagers) == it.CurrentPackagerNum {
+			it.UpdatePackagers(bc)
 			it.CurrentPackagerNum = 0
 		}
 	}()
 
 	var block Block
-	go bc.CreateBlock(currentPackager, ws.Gather[currentPackager].PriKey, bc.TxPool, bc.LastBlockHash, &block, it.Chan)
+	block.TXs = bc.TxPool
+	go bc.CreateBlock(currentPackager, ws, bc.LastBlockHash, &block, it.Chan, it.Packagers)
 
 	go func() {
 		select {
-		case _, ok := <-it.Chan:
+		case isOK, ok := <-it.Chan:
 			if ok {
-				it.DB.View(func(tx *bolt.Tx) error {
-					b := tx.Bucket([]byte(types.BlockChainBucketName))
-					blockinfo, _ := json.Marshal(block)
-					b.Put(bc.LastBlockHash[:], blockinfo)
+				if isOK {
+					it.DB.View(func(tx *bolt.Tx) error {
+						b := tx.Bucket([]byte(types.BlockChainBucketName))
+						blockinfo, _ := json.Marshal(block)
+						b.Put(bc.LastBlockHash[:], blockinfo)
 
-					bc.LastBlockHash = block.Header.Hash
-					return nil
-				})
+						bc.LastBlockHash = block.Header.Hash
+						return nil
+					})
+				} else {
+					it.DB.Update(func(tx *bolt.Tx) error {
+						b := tx.Bucket([]byte(types.AccountBucketName))
+						b.Put([]byte(currentPackager), []byte(types.NodeTypes))
+						return nil
+					})
+
+					fmt.Errorf("打包区块失败，你已经失去管理员资格！\n")
+				}
 			}
 		case <-time.After(time.Second * 5):
 			// 多少秒内没处理完毕
