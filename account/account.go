@@ -46,7 +46,6 @@ func IsValidAddress(address string) bool {
 	decodeInfo := base58.Decode(address)
 	// 2.如果没有25个字节，则给的地址错误
 	if len(decodeInfo) != 25 {
-		fmt.Println("1")
 		return false
 	}
 	// 3.取出前21个字节，运行CheckSum函数得到checksum1

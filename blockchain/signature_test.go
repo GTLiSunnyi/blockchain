@@ -27,7 +27,7 @@ func TestSignature(t *testing.T) {
 	defer db.Close()
 
 	var accounts = account.NewAccounts(db)
-	var w, address = accounts.NewAccount()
+	var w, address = accounts.NewAccount(types.NodeTypes)
 
 	var block Block
 	block.Txs = []tx.Tx{*tx.NewTx("asdfghjk", address)}
@@ -40,7 +40,7 @@ func TestSignature(t *testing.T) {
 		t.Error("failed")
 	}
 
-	var newAccount, _ = accounts.NewAccount()
+	var newAccount, _ = accounts.NewAccount(types.NodeTypes)
 	isValid = block.Txs[0].IsValid(newAccount.PubKey)
 	if !isValid {
 		t.Log("success")

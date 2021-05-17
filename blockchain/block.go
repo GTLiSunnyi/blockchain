@@ -88,8 +88,8 @@ func (block *Block) Verify(packagers []string, accounts *account.Accounts) bool 
 // 设置梅克尔根，取哈希后签名
 func (block *Block) setTxSignatureAndMerkle(prikey *ecdsa.PrivateKey, bc *BC) {
 	// 遍历交易
-	for _, tx := range block.Txs {
-		tx.Sign(prikey)
+	for i, tx := range block.Txs {
+		block.Txs[i] = *tx.Sign(prikey)
 	}
 
 	bc.TxPool = nil

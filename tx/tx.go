@@ -27,7 +27,7 @@ func GetPubKeyHash(address string) []byte {
 }
 
 // 对交易进行签名
-func (tx *Tx) Sign(prikey *ecdsa.PrivateKey) {
+func (tx *Tx) Sign(prikey *ecdsa.PrivateKey) *Tx {
 	hashText := sha1.Sum([]byte(tx.Data))
 
 	//数字签名
@@ -37,6 +37,8 @@ func (tx *Tx) Sign(prikey *ecdsa.PrivateKey) {
 	sText, _ := s.MarshalText()
 
 	tx.Signature = [][]byte{rText, sText}
+
+	return tx
 }
 
 // 校验交易签名是否正确

@@ -27,8 +27,7 @@ func NewAccounts(db *bolt.DB) *Accounts {
 	gather := make(map[string]*Account)
 	accounts := &Accounts{Gather: gather}
 
-	_, superAddress := accounts.NewAccount()
-	accounts.Gather[superAddress].AccountType = types.SuperTypes
+	_, superAddress := accounts.NewAccount(types.SuperTypes)
 	types.CurrentUsers = superAddress
 
 	// 账户数据库
@@ -53,7 +52,7 @@ func NewAccounts(db *bolt.DB) *Accounts {
 	return accounts
 }
 
-func (accounts *Accounts) NewAccount() (*Account, string) {
+func (accounts *Accounts) NewAccount(accountType types.AccountType) (*Account, string) {
 	// 创建钱包，并保存到钱包集合中，最后保存到本地文件
 	// 创建私钥
 	priKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -68,7 +67,7 @@ func (accounts *Accounts) NewAccount() (*Account, string) {
 
 	// pubKeyByte := append(pubKey.X.Bytes(), pubKey.Y.Bytes()...)
 
-	account := &Account{types.NodeTypes, "", &pubKey, priKey}
+	account := &Account{accountType, "", &pubKey, priKey}
 	address := account.GetAddress()
 
 	accounts.Gather[address] = account
@@ -129,7 +128,7 @@ func (accounts *Accounts) SaveFile() {
 
 // 创建普通节点
 func (accounts *Accounts) CreateNodeAccount() string {
-	_, address := accounts.NewAccount()
+	_, address := accounts.NewAccount(types.NodeTypes)
 
 	accounts.DB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(types.AccountBucketName))
@@ -161,6 +160,5 @@ func (accounts *Accounts) RmPms(address string) {
 }
 
 func (accounts *Accounts) IsInAccounts(address string) bool {
-	fmt.Println(accounts.Gather[address].AccountType)
 	return accounts.Gather[address] != nil
 }

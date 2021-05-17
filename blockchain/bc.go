@@ -45,8 +45,8 @@ func NewBC() (*BC, *bolt.DB) {
 }
 
 func (bc *BC) RunBC(accounts *account.Accounts, c chan string) {
-	it := bc.NewIterator()
-	it.UpdatePackagers(bc)
+	it := bc.NewIterator(accounts)
+	it.UpdatePackagers(accounts)
 
 	var block Block
 	bc.CreateBlock(types.CurrentUsers, accounts, [32]byte{}, &block, nil, nil)
@@ -67,27 +67,20 @@ type Iterator struct {
 	Chan               chan bool
 }
 
-func (bc *BC) NewIterator() *Iterator {
+func (bc *BC) NewIterator(accounts *account.Accounts) *Iterator {
 	it := Iterator{
 		CurrentPackagerNum: 0,
 		DB:                 bc.DB,
 		Chan:               make(chan bool),
 	}
 
-	it.Packagers = it.UpdatePackagers(bc)
+	it.UpdatePackagers(accounts)
 	return &it
 }
 
 // 运行迭代器
 func (it *Iterator) Run(bc *BC, accounts *account.Accounts) {
 	currentPackager := it.Packagers[it.CurrentPackagerNum]
-	defer func() {
-		it.CurrentPackagerNum++
-		if len(it.Packagers) == it.CurrentPackagerNum {
-			it.UpdatePackagers(bc)
-			it.CurrentPackagerNum = 0
-		}
-	}()
 
 	var block Block
 	block.Txs = bc.TxPool
@@ -133,23 +126,21 @@ func (it *Iterator) Run(bc *BC, accounts *account.Accounts) {
 
 			fmt.Println("未在指定时间内打包完成，你已经失去管理员资格！")
 		}
+
+		if len(it.Packagers) == it.CurrentPackagerNum {
+			it.UpdatePackagers(accounts)
+			it.CurrentPackagerNum = 0
+		}
 	}()
 }
 
-func (it *Iterator) UpdatePackagers(bc *BC) []string {
-	var packagers []string
-	bc.DB.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(types.AccountBucketName))
-		_ = b.ForEach(func(k, v []byte) error {
-			if string(v) == string(types.AdminTypes) || string(v) == string(types.SuperTypes) {
-				packagers = append(packagers, string(k))
-			}
-			return nil
-		})
-		return nil
-	})
-
-	return packagers
+func (it *Iterator) UpdatePackagers(accounts *account.Accounts) {
+	it.Packagers = nil
+	for _, v := range accounts.Gather {
+		if v.AccountType == types.AdminTypes || v.AccountType == types.SuperTypes {
+			it.Packagers = append(it.Packagers, v.Address)
+		}
+	}
 }
 
 func (bc *BC) QueryBlock(order string) {

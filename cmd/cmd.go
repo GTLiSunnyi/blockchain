@@ -22,8 +22,7 @@ func NewCmd() *Cmd {
 	bc, db := blockchain.NewBC()
 	accounts := account.NewAccounts(db)
 	denoms := denom.NewDenoms(db)
-	cmd := &Cmd{bc, accounts, denoms, make(chan string)}
-	return cmd
+	return &Cmd{bc, accounts, denoms, make(chan string)}
 }
 
 func (cmd *Cmd) SuperRun() {
