@@ -9,10 +9,14 @@ import (
 	"github.com/btcsuite/btcutil/base58"
 )
 
-type TX struct {
-	Signature  [][]byte
-	DenomTX    []byte
-	OrdinaryTX []byte
+type Tx struct {
+	Signature [][]byte
+	Data      string
+	Address   string
+}
+
+func NewTx(txData string, address string) *Tx {
+	return &Tx{nil, txData, address}
 }
 
 // 将地址转换为公钥哈希
@@ -22,19 +26,9 @@ func GetPubKeyHash(address string) []byte {
 	return pubKeyHash
 }
 
-// 创建文件交易
-func NewFileTx(ordinaryTX []byte) *TX {
-	return &TX{OrdinaryTX: ordinaryTX}
-}
-
-// 创建denom交易
-func NewDenomTX(denomRecord []byte) *TX {
-	return &TX{DenomTX: denomRecord}
-}
-
 // 对交易进行签名
-func (tx *TX) Sign(prikey *ecdsa.PrivateKey) {
-	hashText := sha1.Sum(append(tx.DenomTX, tx.OrdinaryTX...))
+func (tx *Tx) Sign(prikey *ecdsa.PrivateKey) {
+	hashText := sha1.Sum([]byte(tx.Data))
 
 	//数字签名
 	r, s, _ := ecdsa.Sign(rand.Reader, prikey, hashText[:])
@@ -46,14 +40,14 @@ func (tx *TX) Sign(prikey *ecdsa.PrivateKey) {
 }
 
 // 校验交易签名是否正确
-func (tx *TX) IsValid(pubkey *ecdsa.PublicKey) bool {
+func (tx *Tx) IsValid(pubkey *ecdsa.PublicKey) bool {
 	var r, s big.Int
 	r.UnmarshalText(tx.Signature[0])
 	s.UnmarshalText(tx.Signature[1])
 
 	signatureCopy := tx.Signature
 	tx.Signature = nil
-	hashText := sha1.Sum(append(tx.DenomTX, tx.OrdinaryTX...))
+	hashText := sha1.Sum([]byte(tx.Data))
 
 	//认证
 	res := ecdsa.Verify(pubkey, hashText[:], &r, &s)

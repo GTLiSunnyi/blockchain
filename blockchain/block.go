@@ -8,15 +8,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/GTLiSunnyi/blockchain/account"
 	"github.com/GTLiSunnyi/blockchain/tx"
 	"github.com/GTLiSunnyi/blockchain/types"
 	"github.com/GTLiSunnyi/blockchain/utils"
-	"github.com/GTLiSunnyi/blockchain/wallet"
 )
 
 type Block struct {
 	Header *Header
-	TXs    []tx.TX // 交易数据
+	Txs    []tx.Tx // 交易数据
 }
 
 type Header struct {
@@ -27,30 +27,36 @@ type Header struct {
 	Address      string        // 打包区块的人
 	Hash         [32]byte      // 当前区块哈希
 	Height       int           // 区块高度
+	Version      string
 }
 
 // 创建区块
-func (bc *BC) CreateBlock(address string, ws *wallet.Wallets, preBlockHash [32]byte, block *Block, c chan bool, packagers []string) {
+func (bc *BC) CreateBlock(address string, accounts *account.Accounts, preBlockHash [32]byte, block *Block, c chan bool, packagers []string) {
 	var header = &Header{
 		PreBlockHash: preBlockHash,
 		TimeStamp:    uint64(time.Now().Unix()),
 		Interval:     types.Interval,
 		Address:      address,
+		Version:      types.Version,
 	}
 
 	block.Header = header
 
-	block.setTxSignatureAndMerkle(ws.Gather[address].PriKey, bc)
-	block.Header.Hash = block.GetBlockHash()
+	block.setTxSignatureAndMerkle(accounts.Gather[address].PriKey, bc)
 	block.Header.Height = types.Height
+	block.Header.Hash = block.GetBlockHash()
 
 	types.Height++
 
-	isOK := block.Verify(packagers, ws)
+	isOK := block.Verify(packagers, accounts)
 
 	if isOK {
+		bc.LastBlockHash = block.Header.Hash
+
 		fmt.Printf("打包完成，区块高度：%d，区块哈希：%X。\n", block.Header.Height, block.Header.Hash)
 		fmt.Println("打包者地址：", address)
+		fmt.Printf("交易信息：%+v\n", block.Txs)
+
 		if c == nil {
 			return
 		}
@@ -61,11 +67,11 @@ func (bc *BC) CreateBlock(address string, ws *wallet.Wallets, preBlockHash [32]b
 	}
 }
 
-func (block *Block) Verify(packagers []string, ws *wallet.Wallets) bool {
-	for _, tx := range block.TXs {
+func (block *Block) Verify(packagers []string, accounts *account.Accounts) bool {
+	for _, tx := range block.Txs {
 		var sum int
 		for _, packager := range packagers {
-			isTrue := tx.IsValid(ws.Gather[packager].PubKey)
+			isTrue := tx.IsValid(accounts.Gather[packager].PubKey)
 			if isTrue {
 				sum++
 			}
@@ -81,7 +87,7 @@ func (block *Block) Verify(packagers []string, ws *wallet.Wallets) bool {
 // 设置梅克尔根，取哈希后签名
 func (block *Block) setTxSignatureAndMerkle(prikey *ecdsa.PrivateKey, bc *BC) {
 	// 遍历交易
-	for _, tx := range block.TXs {
+	for _, tx := range block.Txs {
 		tx.Sign(prikey)
 	}
 
@@ -97,6 +103,7 @@ func (block *Block) GetBlockHash() [32]byte {
 		utils.UintToByte(block.Header.TimeStamp),
 		block.Header.MerkleRoot[:],
 		[]byte(block.Header.Address),
+		[]byte(block.Header.Version),
 	}
 
 	data := bytes.Join(tmp, []byte{})
@@ -109,7 +116,7 @@ func (block *Block) GetBlockHash() [32]byte {
 func (block *Block) setMerkle() {
 	var bytes []byte
 	// 遍历交易
-	for _, tx := range block.TXs {
+	for _, tx := range block.Txs {
 		txByte, _ := json.Marshal(tx)
 		bytes = append(bytes, txByte...)
 	}

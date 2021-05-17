@@ -1,4 +1,4 @@
-package wallet
+package account
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ import (
 	"github.com/GTLiSunnyi/blockchain/types"
 )
 
-type Wallet struct {
+type Account struct {
 	types.AccountType
 	Address string
 	PubKey  *ecdsa.PublicKey
@@ -21,9 +21,9 @@ type Wallet struct {
 }
 
 // 获取钱包地址
-func (wallet *Wallet) GetAddress() string {
+func (account *Account) GetAddress() string {
 	// 将公钥进行一系列处理后得到地址
-	pubKeyHash /*20字节*/ := HashPubKey(wallet.PubKey)
+	pubKeyHash /*20字节*/ := HashPubKey(account.PubKey)
 	version /*1字节*/ := 0x00
 	// 21字节数据
 	payload := append([]byte{byte(version)}, pubKeyHash...)
@@ -34,7 +34,7 @@ func (wallet *Wallet) GetAddress() string {
 	// base58处理
 	address := base58.Encode(payload)
 
-	wallet.Address = address
+	account.Address = address
 	fmt.Println("钱包地址为：", address)
 
 	return address

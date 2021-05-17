@@ -4,27 +4,37 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/GTLiSunnyi/blockchain/account"
+	"github.com/GTLiSunnyi/blockchain/blockchain"
+	"github.com/GTLiSunnyi/blockchain/denom"
+	"github.com/GTLiSunnyi/blockchain/tx"
 	"github.com/GTLiSunnyi/blockchain/types"
-	"github.com/GTLiSunnyi/blockchain/wallet"
 )
 
 type Cmd struct {
+	*blockchain.BC
+	Accounts *account.Accounts
+	Denoms   denom.Denoms
 	ChanList chan string
 }
 
 func NewCmd() *Cmd {
-	cmd := &Cmd{make(chan string, 100)}
+	bc, db := blockchain.NewBC()
+	accounts := account.NewAccounts(db)
+	denoms := denom.NewDenoms(db)
+	cmd := &Cmd{bc, accounts, *denoms, make(chan string)}
 	return cmd
 }
 
-func (cmd *Cmd) SuperRun(ws *wallet.Wallets) {
+func (cmd *Cmd) SuperRun() {
 	// 提示信息
 	const prompt = `
 *******************************
 add            添加用户
 use            切换用户         
-addPms         增加权限       
-createNode     创建节点       
+addPms         增加权限 
+rmPms          撤销权限
+denom          denom/nft           
 query          查询区块、节点 
 quit           退出程序
 *******************************
@@ -36,20 +46,29 @@ quit           退出程序
 		fmt.Scan(&order)
 		switch order {
 		case "add":
+			types.Ticker.Stop()
+			_ = cmd.Accounts.CreateNodeAccount()
+			fmt.Println("添加用户成功！")
+			types.Ticker.Reset(types.Interval)
 		case "use":
 			// 切换用户
+			types.Ticker.Stop()
 			fmt.Println("请输入切换用户的地址：")
-			cmd.ChanList <- "stop"
 			fmt.Scan(&order)
-			cmd.SwitchUsers(true, ws, order)
-			cmd.ChanList <- "run"
+			cmd.SwitchUsers(order)
+			types.Ticker.Reset(types.Interval)
 		case "addPms":
-			fmt.Println("请输入切换用户的地址：")
+			types.Ticker.Stop()
+			fmt.Println("请输入用户的地址：")
 			fmt.Scan(&order)
-			ws.AddPms(order)
-		case "createNode":
-			ws.CreateNodeAccount()
+			cmd.Accounts.AddPms(order)
+			types.Ticker.Reset(types.Interval)
+		case "rmPms":
+			fmt.Println("请输入用户地址：")
+			fmt.Scan(&order)
+			cmd.Accounts.RmPms(order)
 		case "query":
+			cmd.ChanList <- "stop"
 			fmt.Println("请输入需要查询的事物：")
 			fmt.Println(`
 	*******************************
@@ -60,11 +79,15 @@ quit           退出程序
 			fmt.Scan(&order)
 			switch order {
 			case "account":
-				ws.QueryAccount()
+				cmd.Accounts.QueryAccount()
 			case "block":
+				fmt.Println("请输入区块高度：")
+				fmt.Scan(&order)
+				cmd.BC.QueryBlock(order)
 			default:
 				fmt.Println("请输入正确的命令")
 			}
+			cmd.ChanList <- "start"
 		case "quit":
 			fmt.Println("exit...")
 			os.Exit(-1)
@@ -74,7 +97,7 @@ quit           退出程序
 	}
 }
 
-func (cmd *Cmd) AdminRun(ws *wallet.Wallets) {
+func (cmd *Cmd) AdminRun() {
 	// 提示信息
 	const prompt = `
 *******************************
@@ -94,17 +117,14 @@ quit      退出程序
 		case "use":
 			// 切换用户
 			fmt.Println("请输入切换用户的地址：")
+			cmd.ChanList <- "stop"
 			fmt.Scan(&order)
-			cmd.SwitchUsers(false, ws, order)
+			cmd.SwitchUsers(order)
+			cmd.ChanList <- "start"
 		case "send":
-		// 	bc.addBlock(true)
-		// case "balance":
-		// 	fmt.Println("请输入获取对象")
-		// 	fmt.Scan(&order)
-		// 	balance, isOrderExist := bc.GetBalance(order)
-		// 	if isOrderExist {
-		// 		fmt.Printf("%v的余额为%v\n", order, balance)
-		// 	}
+			fmt.Println("请输入交易数据：")
+			fmt.Scan(&order)
+			cmd.BC.SendTx(tx.NewTx(order, types.CurrentUsers))
 		case "wallet":
 		// 	wallets := NewWallets()
 		// 	wallets.CreateWallets()
@@ -137,7 +157,7 @@ quit      退出程序
 	}
 }
 
-func (cmd *Cmd) NodeRun(ws *wallet.Wallets) {
+func (cmd *Cmd) NodeRun() {
 	// 提示信息
 	const prompt = `
 *******************************
@@ -156,8 +176,10 @@ quit        退出程序
 		case "use":
 			// 切换用户
 			fmt.Println("请输入切换用户的地址：")
+			cmd.ChanList <- "stop"
 			fmt.Scan(&order)
-			cmd.SwitchUsers(false, ws, order)
+			cmd.SwitchUsers(order)
+			cmd.ChanList <- "start"
 		case "send":
 			// bc.addBlock(true)
 		case "query":
@@ -186,30 +208,23 @@ quit        退出程序
 	}
 }
 
-func (cmd *Cmd) SwitchUsers(isSuper bool, ws *wallet.Wallets, addr string) {
+func (cmd *Cmd) SwitchUsers(address string) {
 	var accountType string
 
-	if !ws.IsInAccounts(addr) {
-		if isSuper {
-			nodeAddr := ws.CreateNodeAccount()
-			fmt.Println("切换到一个新的普通节点，addr：", nodeAddr)
-			accountType = "普通节点"
-			types.CurrentUsers = addr
-		} else {
-			fmt.Println("输入的账户不存在！请使用超级管理员创建账户。")
-			return
-		}
+	if !cmd.Accounts.IsInAccounts(address) {
+		fmt.Println("输入的账户不存在！请使用超级管理员创建账户。")
+		return
 	} else {
-		types.CurrentUsers = addr
-		fmt.Sprintf("切换成功！\n当前用户：%s, %s", accountType, addr)
+		types.CurrentUsers = address
+		fmt.Printf("切换成功！\n当前用户：%s, %s\n", cmd.Accounts.Gather[address].AccountType, address)
 	}
 
 	switch accountType {
 	case "超级管理员":
-		cmd.SuperRun(ws)
+		cmd.SuperRun()
 	case "管理员":
-		cmd.AdminRun(ws)
+		cmd.AdminRun()
 	case "普通节点":
-		cmd.NodeRun(ws)
+		cmd.NodeRun()
 	}
 }
