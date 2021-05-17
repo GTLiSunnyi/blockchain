@@ -81,7 +81,7 @@ func (denoms *Denoms) CreateDenom(name string, account *account.Account) {
 
 func (denoms *Denoms) MintNft(nftName string, denomName string, uri string) *Nft {
 	if ok := denoms.Denom[denomName].Nfts[nftName]; ok != nil {
-		fmt.Errorf("该denom下的nft名称已经存在！")
+		fmt.Println("该denom下的nft名称已经存在！")
 	}
 
 	nft := &Nft{
@@ -105,18 +105,18 @@ func (denoms *Denoms) MintNft(nftName string, denomName string, uri string) *Nft
 
 func (denoms *Denoms) TransferNft(nftName string, denomName string, account *account.Account) {
 	if nftName == "" {
-		fmt.Errorf("nft名称不能是空！")
+		fmt.Println("nft名称不能是空！")
 		return
 	}
 
 	// 转移对象是不是管理员
 	if account.AccountType != types.AdminTypes {
-		fmt.Errorf("不能和非管理员交易")
+		fmt.Println("不能和非管理员交易")
 		return
 	}
 
 	if account.Address == denoms.Denom[denomName].Nfts[nftName].OwnerAccount.Address {
-		fmt.Errorf("不能给自己！")
+		fmt.Println("不能给自己！")
 		return
 	} else {
 		denoms.Denom[denomName].Nfts[denomName].OwnerAccount = account
@@ -132,13 +132,12 @@ func (denoms *Denoms) TransferNft(nftName string, denomName string, account *acc
 	}
 }
 
-func (denoms *Denoms) Query(nftName string, denomName string, account *account.Account) {
-	if ok := denoms.Denom[denomName].Nfts[nftName]; ok == nil {
-		fmt.Println("此名称的nft不存在")
-		return
+func (denoms *Denoms) Query(address string) {
+	for denomName, denom := range denoms.Denom {
+		if denom.OwnerAccount.Address == address {
+			fmt.Printf("与您相关的denom信息如下：%+v\n", denoms.Denom[denomName])
+		}
 	}
-
-	fmt.Printf("与您相关的denom信息如下：%+v\n", denoms.Denom[denomName])
 }
 
 func (denoms *Denoms) RmPms(address string) {

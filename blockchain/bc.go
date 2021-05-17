@@ -53,7 +53,7 @@ func (bc *BC) RunBC(accounts *account.Accounts, c chan string) {
 
 	// 定时执行共识任务
 	go func() {
-		for _ = range types.Ticker.C {
+		for range types.Ticker.C {
 			it.Run(bc, accounts)
 		}
 	}()
@@ -95,16 +95,32 @@ func (it *Iterator) Run(bc *BC, accounts *account.Accounts) {
 
 	go func() {
 		select {
-		case _, ok := <-it.Chan:
+		case isOk, ok := <-it.Chan:
 			if ok {
-				it.DB.View(func(tx *bolt.Tx) error {
-					b := tx.Bucket([]byte(types.BlockChainBucketName))
-					blockinfo, _ := json.Marshal(block)
-					b.Put([]byte{byte(block.Header.Height)}, bc.LastBlockHash[:])
-					b.Put(bc.LastBlockHash[:], blockinfo)
+				if isOk {
+					it.DB.View(func(tx *bolt.Tx) error {
+						b := tx.Bucket([]byte(types.BlockChainBucketName))
+						blockinfo, _ := json.Marshal(block)
+						b.Put([]byte{byte(block.Header.Height)}, bc.LastBlockHash[:])
+						b.Put(bc.LastBlockHash[:], blockinfo)
 
-					return nil
-				})
+						fmt.Printf("打包完成，区块高度：%d\n", block.Header.Height)
+						fmt.Printf("区块哈希：%X\n", block.Header.Hash)
+						fmt.Println("打包者地址：", block.Header.Address)
+						fmt.Printf("交易信息：%+v\n", block.Txs)
+
+						return nil
+					})
+				} else {
+					// 取消这次打包，并撤销管理员职位
+					it.DB.Update(func(tx *bolt.Tx) error {
+						b := tx.Bucket([]byte(types.AccountBucketName))
+						b.Put([]byte(currentPackager), []byte(types.NodeTypes))
+						return nil
+					})
+
+					fmt.Println("区块验证失败, 你已经失去管理员资格！")
+				}
 			}
 		case <-time.After(types.Interval):
 			// 多少秒内没处理完毕
@@ -115,7 +131,7 @@ func (it *Iterator) Run(bc *BC, accounts *account.Accounts) {
 				return nil
 			})
 
-			fmt.Errorf("未在指定时间内打包完成，你已经失去管理员资格！\n")
+			fmt.Println("未在指定时间内打包完成，你已经失去管理员资格！")
 		}
 	}()
 }
@@ -148,7 +164,7 @@ func (bc *BC) QueryBlock(order string) {
 		blockHash := b.Get([]byte{byte(height)})
 
 		if blockHash == nil {
-			fmt.Errorf("该区块高度不存在！")
+			fmt.Println("该区块高度不存在！")
 			return nil
 		}
 

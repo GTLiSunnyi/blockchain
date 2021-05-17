@@ -27,8 +27,8 @@ func NewAccounts(db *bolt.DB) *Accounts {
 	gather := make(map[string]*Account)
 	accounts := &Accounts{Gather: gather}
 
-	superWallet, superAddress := accounts.NewAccount()
-	superWallet.AccountType = types.SuperTypes
+	_, superAddress := accounts.NewAccount()
+	accounts.Gather[superAddress].AccountType = types.SuperTypes
 	types.CurrentUsers = superAddress
 
 	// 账户数据库
@@ -143,12 +143,11 @@ func (accounts *Accounts) CreateNodeAccount() string {
 }
 
 func (accounts *Accounts) AddPms(address string) {
-	fmt.Println(address)
 	if accounts.IsInAccounts(address) {
 		accounts.Gather[address].AccountType = types.AdminTypes
 		fmt.Println("成功将节点权限提升为管理员！")
 	} else {
-		fmt.Errorf("账户不存在！")
+		fmt.Println("账户不存在！")
 	}
 }
 
@@ -157,11 +156,11 @@ func (accounts *Accounts) RmPms(address string) {
 		accounts.Gather[address].AccountType = types.NodeTypes
 		fmt.Println("成功将节点权降低为普通节点！")
 	} else {
-		fmt.Errorf("账户不存在！")
+		fmt.Println("账户不存在！")
 	}
 }
 
-func (accounts *Accounts) IsInAccounts(addrress string) bool {
-	fmt.Printf("%+v", accounts.Gather[addrress])
-	return accounts.Gather[addrress] != nil
+func (accounts *Accounts) IsInAccounts(address string) bool {
+	fmt.Println(accounts.Gather[address].AccountType)
+	return accounts.Gather[address] != nil
 }

@@ -13,8 +13,8 @@ import (
 
 type Cmd struct {
 	*blockchain.BC
-	Accounts *account.Accounts
-	Denoms   denom.Denoms
+	*account.Accounts
+	*denom.Denoms
 	ChanList chan string
 }
 
@@ -22,7 +22,7 @@ func NewCmd() *Cmd {
 	bc, db := blockchain.NewBC()
 	accounts := account.NewAccounts(db)
 	denoms := denom.NewDenoms(db)
-	cmd := &Cmd{bc, accounts, *denoms, make(chan string)}
+	cmd := &Cmd{bc, accounts, denoms, make(chan string)}
 	return cmd
 }
 
@@ -64,11 +64,13 @@ quit           退出程序
 			cmd.Accounts.AddPms(order)
 			types.Ticker.Reset(types.Interval)
 		case "rmPms":
+			types.Ticker.Stop()
 			fmt.Println("请输入用户地址：")
 			fmt.Scan(&order)
 			cmd.Accounts.RmPms(order)
+			types.Ticker.Reset(types.Interval)
 		case "query":
-			cmd.ChanList <- "stop"
+			types.Ticker.Stop()
 			fmt.Println("请输入需要查询的事物：")
 			fmt.Println(`
 	*******************************
@@ -87,8 +89,9 @@ quit           退出程序
 			default:
 				fmt.Println("请输入正确的命令")
 			}
-			cmd.ChanList <- "start"
+			types.Ticker.Reset(types.Interval)
 		case "quit":
+			types.Ticker.Stop()
 			fmt.Println("exit...")
 			os.Exit(-1)
 		default:
@@ -104,7 +107,7 @@ func (cmd *Cmd) AdminRun() {
 use       切换用户
 send      发送普通交易
 denom	  denom
-query     查询区块、节点
+query     查询区块、denom
 quit      退出程序
 *******************************
 `
@@ -116,39 +119,40 @@ quit      退出程序
 		switch order {
 		case "use":
 			// 切换用户
+			types.Ticker.Stop()
 			fmt.Println("请输入切换用户的地址：")
-			cmd.ChanList <- "stop"
 			fmt.Scan(&order)
 			cmd.SwitchUsers(order)
-			cmd.ChanList <- "start"
+			types.Ticker.Reset(types.Interval)
 		case "send":
+			types.Ticker.Stop()
 			fmt.Println("请输入交易数据：")
 			fmt.Scan(&order)
 			cmd.BC.SendTx(tx.NewTx(order, types.CurrentUsers))
-		case "wallet":
-		// 	wallets := NewWallets()
-		// 	wallets.CreateWallets()
-		// case "list":
-		// 	wallets := NewWallets()
-		// 	wallets.GetList()
-		// case "print":
-		// 	it := bc.NewIterator()
-		// 	// 打印区块链
-		// 	for {
-		// 		block := it.Run()
-		// 		fmt.Println("++++++++++++++++++++++++++++++++++++++++++++++++++++")
-		// 		fmt.Printf("preBlockHash: %v\n", block.PreBlockHash)
-		// 		fmt.Printf("merkleRoot: %v\n", block.MerkleRoot)
-		// 		timeFormat := time.Unix(int64(block.TimeStamp), 0).Format("2006-01-02 15:04:05")
-		// 		fmt.Printf("timeStamp : %s\n", timeFormat)
-		// 		fmt.Printf("difficulty: %v\n", block.Difficulty)
-		// 		fmt.Printf("nonce: %v\n", block.Nonce)
-		// 		fmt.Printf("hash: %v\n", block.Hash)
-		// 		if block.PreBlockHash == nil {
-		// 			break
-		// 		}
-		// 	}
+			types.Ticker.Reset(types.Interval)
+		case "query":
+			types.Ticker.Stop()
+			fmt.Println("请输入需要查询的事物：")
+			fmt.Println(`
+	*******************************
+	block        查询区块
+	denom        查询denom
+	*******************************
+	`)
+			fmt.Scan(&order)
+			switch order {
+			case "block":
+				fmt.Println("请输入区块高度：")
+				fmt.Scan(&order)
+				cmd.BC.QueryBlock(order)
+			case "denom":
+				cmd.Denoms.Query(types.CurrentUsers)
+			default:
+				fmt.Println("请输入正确的命令")
+			}
+			types.Ticker.Reset(types.Interval)
 		case "quit":
+			types.Ticker.Stop()
 			fmt.Println("exit...")
 			os.Exit(-1)
 		default:
@@ -163,7 +167,7 @@ func (cmd *Cmd) NodeRun() {
 *******************************
 use      	切换用户
 send        发送普通交易
-query       查询区块、节点
+query       查询区块、denom
 quit        退出程序
 *******************************
 `
@@ -209,8 +213,6 @@ quit        退出程序
 }
 
 func (cmd *Cmd) SwitchUsers(address string) {
-	var accountType string
-
 	if !cmd.Accounts.IsInAccounts(address) {
 		fmt.Println("输入的账户不存在！请使用超级管理员创建账户。")
 		return
@@ -219,12 +221,14 @@ func (cmd *Cmd) SwitchUsers(address string) {
 		fmt.Printf("切换成功！\n当前用户：%s, %s\n", cmd.Accounts.Gather[address].AccountType, address)
 	}
 
-	switch accountType {
-	case "超级管理员":
+	switch cmd.Accounts.Gather[address].AccountType {
+	case types.SuperTypes:
 		cmd.SuperRun()
-	case "管理员":
+	case types.AdminTypes:
 		cmd.AdminRun()
-	case "普通节点":
+	case types.NodeTypes:
 		cmd.NodeRun()
+	default:
+		fmt.Println("切换节点失败")
 	}
 }
