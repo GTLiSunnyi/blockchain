@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/GTLiSunnyi/blockchain/account"
 	"github.com/GTLiSunnyi/blockchain/types"
-	"github.com/boltdb/bolt"
 )
 
 type Denoms struct {
@@ -38,50 +39,36 @@ func NewDenoms(db *bolt.DB) *Denoms {
 				panic(err)
 			}
 		}
-
-		b.Put([]byte(types.CurrentUsers), []byte(types.SuperTypes))
 		return nil
 	})
 
-	return &Denoms{nil, db}
+	return &Denoms{make(map[string]*Denom), db}
 }
 
 func (denoms *Denoms) CreateDenom(name string, account *account.Account) {
 	if account.AccountType == types.AdminTypes {
-		denoms := &Denoms{}
-		denoms.Denom = make(map[string]*Denom)
-		denoms.Denom[name] = &Denom{name, account, nil}
-
-		var denomName []byte
-		denoms.DB.Update(func(tx *bolt.Tx) error {
-			b := tx.Bucket([]byte(types.DenomBucketName))
-			denomName = b.Get([]byte(denoms.Denom[name].Name))
-
-			if denomName == nil {
+		for _, denom := range denoms.Denom {
+			if denom.Name == name {
 				fmt.Println("该denom名称已经存在！")
-				return nil
-			} else {
-				d, _ := json.Marshal(denoms)
-				b.Put([]byte("1"), d)
+				return
 			}
-
-			return nil
-		})
-
-		if denomName == nil {
-			return
-		} else {
-			fmt.Println("创建denom成功！")
 		}
+		denoms.Denom[name] = &Denom{name, account, make(map[string]*Nft)}
+		fmt.Println("创建denom成功！")
 	} else {
-		fmt.Println("只有管理员才能创建denom！")
-		return
+		fmt.Println("非管理员，不能创建denom！")
 	}
 }
 
 func (denoms *Denoms) MintNft(nftName string, denomName string, uri string) *Nft {
+	if ok := denoms.Denom[denomName]; ok == nil {
+		fmt.Println("此denom名称不存在！")
+		return nil
+	}
+
 	if ok := denoms.Denom[denomName].Nfts[nftName]; ok != nil {
 		fmt.Println("该denom下的nft名称已经存在！")
+		return nil
 	}
 
 	nft := &Nft{
@@ -99,6 +86,8 @@ func (denoms *Denoms) MintNft(nftName string, denomName string, uri string) *Nft
 		b.Put([]byte(denomName), d)
 		return nil
 	})
+
+	fmt.Printf("增发nft成功，nft name：%s\n", nftName)
 
 	return nft
 }
@@ -121,13 +110,6 @@ func (denoms *Denoms) TransferNft(nftName string, denomName string, account *acc
 	} else {
 		denoms.Denom[denomName].Nfts[denomName].OwnerAccount = account
 
-		denoms.DB.Update(func(tx *bolt.Tx) error {
-			b := tx.Bucket([]byte(types.DenomBucketName))
-			d, _ := json.Marshal(denoms)
-			b.Put([]byte(denomName), d)
-			return nil
-		})
-
 		fmt.Println("nft交易成功！")
 	}
 }
@@ -136,8 +118,16 @@ func (denoms *Denoms) Query(address string) {
 	for denomName, denom := range denoms.Denom {
 		if denom.OwnerAccount.Address == address {
 			fmt.Printf("与您相关的denom信息如下：%+v\n", denoms.Denom[denomName])
+		} else {
+			for i, nft := range denom.Nfts {
+				if nft.OwnerAccount.Address == address {
+					fmt.Printf("与您相关的denom信息如下：%+v\n", denoms.Denom[denomName].Nfts[i])
+				}
+			}
 		}
 	}
+
+	fmt.Println("已经打印所有的关于您的denom和nft信息！")
 }
 
 func (denoms *Denoms) RmPms(address string) {

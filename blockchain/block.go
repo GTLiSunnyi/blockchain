@@ -51,14 +51,7 @@ func (bc *BC) CreateBlock(address string, accounts *account.Accounts, preBlockHa
 	isOK := block.Verify(packagers, accounts)
 
 	if isOK {
-		bc.LastBlockHash = block.Header.Hash
-
 		if c == nil {
-			fmt.Printf("打包完成，区块高度：%d\n", block.Header.Height)
-			fmt.Printf("区块哈希：%X\n", block.Header.Hash)
-			fmt.Println("打包者地址：", block.Header.Address)
-			fmt.Printf("交易信息：%+v\n", block.Txs)
-
 			return
 		}
 		c <- true

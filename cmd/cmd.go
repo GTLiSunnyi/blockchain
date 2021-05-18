@@ -32,8 +32,7 @@ func (cmd *Cmd) SuperRun() {
 add            添加用户
 use            切换用户         
 addPms         增加权限 
-rmPms          撤销权限
-denom          denom/nft           
+rmPms          撤销权限          
 query          查询区块、节点 
 quit           退出程序
 *******************************
@@ -48,7 +47,6 @@ quit           退出程序
 			types.Ticker.Stop()
 			_ = cmd.Accounts.CreateNodeAccount()
 			fmt.Println("添加用户成功！")
-			types.Ticker.Reset(types.Interval)
 		case "use":
 			// 切换用户
 			types.Ticker.Stop()
@@ -122,12 +120,48 @@ quit      退出程序
 			fmt.Println("请输入切换用户的地址：")
 			fmt.Scan(&order)
 			cmd.SwitchUsers(order)
-			types.Ticker.Reset(types.Interval)
 		case "send":
 			types.Ticker.Stop()
 			fmt.Println("请输入交易数据：")
 			fmt.Scan(&order)
 			cmd.BC.SendTx(tx.NewTx(order, types.CurrentUsers))
+			types.Ticker.Reset(types.Interval)
+		case "denom":
+			types.Ticker.Stop()
+			fmt.Println("请输入要执行的事物：")
+			fmt.Println(`
+	*******************************
+	denom        创建denom
+	nft          创建nft
+	transfer     交易nft
+	*******************************
+	`)
+			fmt.Scan(&order)
+			switch order {
+			case "denom":
+				fmt.Println("请输入denom名称：")
+				fmt.Scan(&order)
+				cmd.Denoms.CreateDenom(order, cmd.Accounts.Gather[types.CurrentUsers])
+			case "nft":
+				var nftName string
+				var denomName string
+				fmt.Println("请输入nft名称：")
+				fmt.Scan(&nftName)
+				fmt.Println("请输入denom名称：")
+				fmt.Scan(&denomName)
+				fmt.Println("请输入uri：")
+				fmt.Scan(&order)
+				cmd.Denoms.MintNft(nftName, denomName, order)
+			case "transfer":
+				var nftName string
+				fmt.Println("请输入nft名称：")
+				fmt.Scan(&nftName)
+				fmt.Println("请输入denom名称：")
+				fmt.Scan(&order)
+				cmd.Denoms.TransferNft(nftName, order, cmd.Accounts.Gather[types.CurrentUsers])
+			default:
+				fmt.Println("请输入正确的命令")
+			}
 			types.Ticker.Reset(types.Interval)
 		case "query":
 			types.Ticker.Stop()
@@ -178,31 +212,25 @@ quit        退出程序
 		switch order {
 		case "use":
 			// 切换用户
+			types.Ticker.Stop()
 			fmt.Println("请输入切换用户的地址：")
-			cmd.ChanList <- "stop"
 			fmt.Scan(&order)
 			cmd.SwitchUsers(order)
-			cmd.ChanList <- "start"
+			types.Ticker.Reset(types.Interval)
 		case "send":
-			// bc.addBlock(true)
+			types.Ticker.Stop()
+			fmt.Println("请输入交易数据：")
+			fmt.Scan(&order)
+			cmd.BC.SendTx(tx.NewTx(order, types.CurrentUsers))
+			types.Ticker.Reset(types.Interval)
 		case "query":
-			// it := bc.NewIterator()
-			// // 打印区块链
-			// for {
-			// 	block := it.Run()
-			// 	fmt.Println("++++++++++++++++++++++++++++++++++++++++++++++++++++")
-			// 	fmt.Printf("preBlockHash: %v\n", block.PreBlockHash)
-			// 	fmt.Printf("merkleRoot: %v\n", block.MerkleRoot)
-			// 	timeFormat := time.Unix(int64(block.TimeStamp), 0).Format("2006-01-02 15:04:05")
-			// 	fmt.Printf("timeStamp : %s\n", timeFormat)
-			// 	fmt.Printf("difficulty: %v\n", block.Difficulty)
-			// 	fmt.Printf("nonce: %v\n", block.Nonce)
-			// 	fmt.Printf("hash: %v\n", block.Hash)
-			// 	if block.PreBlockHash == nil {
-			// 		break
-			// 	}
-			// }
+			types.Ticker.Stop()
+			fmt.Println("请输入区块高度：")
+			fmt.Scan(&order)
+			cmd.BC.QueryBlock(order)
+			types.Ticker.Reset(types.Interval)
 		case "quit":
+			types.Ticker.Stop()
 			fmt.Println("exit...")
 			os.Exit(-1)
 		default:
@@ -222,10 +250,13 @@ func (cmd *Cmd) SwitchUsers(address string) {
 
 	switch cmd.Accounts.Gather[address].AccountType {
 	case types.SuperTypes:
+		types.Ticker.Reset(types.Interval)
 		cmd.SuperRun()
 	case types.AdminTypes:
+		types.Ticker.Reset(types.Interval)
 		cmd.AdminRun()
 	case types.NodeTypes:
+		types.Ticker.Reset(types.Interval)
 		cmd.NodeRun()
 	default:
 		fmt.Println("切换节点失败")

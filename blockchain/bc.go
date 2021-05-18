@@ -46,10 +46,22 @@ func NewBC() (*BC, *bolt.DB) {
 
 func (bc *BC) RunBC(accounts *account.Accounts, c chan string) {
 	it := bc.NewIterator(accounts)
-	it.UpdatePackagers(accounts)
 
 	var block Block
 	bc.CreateBlock(types.CurrentUsers, accounts, [32]byte{}, &block, nil, nil)
+	bc.DB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(types.BlockChainBucketName))
+		blockinfo, _ := json.Marshal(block)
+		b.Put([]byte{byte(block.Header.Height)}, bc.LastBlockHash[:])
+		b.Put(bc.LastBlockHash[:], blockinfo)
+
+		fmt.Printf("打包完成，区块高度：%d\n", block.Header.Height)
+		fmt.Printf("区块哈希：%X\n", block.Header.Hash)
+		fmt.Println("打包者地址：", block.Header.Address)
+		fmt.Printf("交易信息：%+v\n", block.Txs)
+
+		return nil
+	})
 
 	// 定时执行共识任务
 	go func() {
@@ -80,7 +92,9 @@ func (bc *BC) NewIterator(accounts *account.Accounts) *Iterator {
 
 // 运行迭代器
 func (it *Iterator) Run(bc *BC, accounts *account.Accounts) {
+	fmt.Println("当前打包区块队列：", it.Packagers)
 	currentPackager := it.Packagers[it.CurrentPackagerNum]
+	it.CurrentPackagerNum++
 
 	var block Block
 	block.Txs = bc.TxPool
@@ -91,7 +105,8 @@ func (it *Iterator) Run(bc *BC, accounts *account.Accounts) {
 		case isOk, ok := <-it.Chan:
 			if ok {
 				if isOk {
-					it.DB.View(func(tx *bolt.Tx) error {
+					bc.LastBlockHash = block.Header.Hash
+					bc.DB.Update(func(tx *bolt.Tx) error {
 						b := tx.Bucket([]byte(types.BlockChainBucketName))
 						blockinfo, _ := json.Marshal(block)
 						b.Put([]byte{byte(block.Header.Height)}, bc.LastBlockHash[:])
@@ -100,7 +115,7 @@ func (it *Iterator) Run(bc *BC, accounts *account.Accounts) {
 						fmt.Printf("打包完成，区块高度：%d\n", block.Header.Height)
 						fmt.Printf("区块哈希：%X\n", block.Header.Hash)
 						fmt.Println("打包者地址：", block.Header.Address)
-						fmt.Printf("交易信息：%+v\n", block.Txs)
+						fmt.Printf("交易信息：%+v\n\n\n", block.Txs)
 
 						return nil
 					})
@@ -118,7 +133,7 @@ func (it *Iterator) Run(bc *BC, accounts *account.Accounts) {
 		case <-time.After(types.Interval):
 			// 多少秒内没处理完毕
 			// 取消这次打包，并撤销管理员职位
-			it.DB.Update(func(tx *bolt.Tx) error {
+			bc.DB.Update(func(tx *bolt.Tx) error {
 				b := tx.Bucket([]byte(types.AccountBucketName))
 				b.Put([]byte(currentPackager), []byte(types.NodeTypes))
 				return nil
@@ -148,6 +163,7 @@ func (bc *BC) QueryBlock(order string) {
 	if err != nil {
 		fmt.Println(err)
 	}
+	fmt.Printf("查询高度：%d", height)
 
 	bc.DB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(types.BlockChainBucketName))
@@ -159,10 +175,9 @@ func (bc *BC) QueryBlock(order string) {
 			return nil
 		}
 
-		var block *Block
 		blockInfo := b.Get(blockHash)
-		json.Unmarshal(blockInfo, &block)
-		fmt.Printf("区块信息：%+v\n", block)
+		fmt.Println("以下是区块信息：")
+		fmt.Println(string(blockInfo))
 
 		return nil
 	})
